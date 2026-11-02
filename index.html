@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<title>HERAKLES JOINT INSPECTION APP</title>
+<meta name="theme-color" content="#1f5fa8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script src="jspdf.umd.min.js"></script>
+<script src="jspdf.plugin.autotable.min.js"></script>
+<style>
+/* Layout: one-phone site tool. Sticky top bar, plan as room picker, big tap targets, a bottom action bar for the next step. */
+:root{
+  --bg:#f2f4f6; --surface:#ffffff; --ink:#17202a; --muted:#5b6977; --line:#d4dbe2;
+  --accent:#1f5fa8; --accent-ink:#ffffff; --accent-soft:#e2ecf8;
+  --ok:#1b7743; --ok-soft:#dff1e6; --nok:#b42318; --nok-soft:#fbe4e1; --warn:#a86200; --warn-soft:#fcefd6; --na:#66727f; --na-soft:#eaedf1;
+  --wall:#17202a; --room:#ffffff;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151b; --surface:#19212a; --ink:#e6ecf2; --muted:#98a6b4; --line:#2d3945;
+  --accent:#6aa6ec; --accent-ink:#0c1520; --accent-soft:#1c2e44;
+  --ok:#5bc489; --ok-soft:#163225; --nok:#ff8a7d; --nok-soft:#3a1c1a; --warn:#efb448; --warn-soft:#382a11; --na:#98a6b4; --na-soft:#242d37;
+  --wall:#e6ecf2; --room:#19212a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151b; --surface:#19212a; --ink:#e6ecf2; --muted:#98a6b4; --line:#2d3945;
+  --accent:#6aa6ec; --accent-ink:#0c1520; --accent-soft:#1c2e44;
+  --ok:#5bc489; --ok-soft:#163225; --nok:#ff8a7d; --nok-soft:#3a1c1a; --warn:#efb448; --warn-soft:#382a11; --na:#98a6b4; --na-soft:#242d37;
+  --wall:#e6ecf2; --room:#19212a; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.4}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--accent)}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--accent);color:var(--accent-ink)}
+header.top .in{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;display:flex;align-items:center;gap:10px}
+.back{border:0;background:rgba(255,255,255,.18);color:inherit;border-radius:9px;min-width:42px;height:42px;font-size:22px;cursor:pointer}
+.ttl{flex:1;min-width:0}
+.ttl .app{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;opacity:.85;display:block}
+.ttl b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wrap{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 120px}
+h1{font-size:22px;margin:4px 0 6px;text-wrap:balance} h2{font-size:17px;margin:22px 0 8px}
+.sub{color:var(--muted);margin:0 0 14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;color:var(--ink);font:inherit;text-align:left;width:100%;display:flex;flex-direction:column;gap:8px;cursor:pointer}
+.list{display:flex;flex-direction:column;gap:10px}
+.k{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+.big{font-size:19px;font-weight:700}
+.bar{height:7px;border-radius:4px;background:var(--na-soft);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok)}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:12.5px;padding:3px 9px;border-radius:999px;background:var(--na-soft);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.nok{background:var(--nok-soft);color:var(--nok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.acc{background:var(--accent-soft);color:var(--accent)}
+.btn{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:11px;padding:12px 16px;font:inherit;font-weight:600;cursor:pointer;min-height:48px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.go{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.btn.danger{color:var(--nok);border-color:var(--nok)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.wide{width:100%}
+button:focus-visible,.card:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,polygon:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field label{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+input[type=text],textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px;font:inherit;background:var(--surface);color:var(--ink)}
+textarea{min-height:64px;resize:vertical}
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choice button{min-height:52px;border-radius:11px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:700;cursor:pointer}
+.choice button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.plan{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px}
+.plan svg{display:block;width:100%;height:auto}
+.rm{fill:var(--room);stroke:var(--wall);stroke-width:5;cursor:pointer}
+.rm.s-prog{fill:var(--accent-soft)} .rm.s-done{fill:var(--ok-soft)} .rm.s-nok{fill:var(--nok-soft)} .rm.sel{fill:var(--accent-soft)} .rm.dim{opacity:.35}
+.plan text{fill:var(--ink);font-family:var(--sans);font-size:34px;font-weight:600;pointer-events:none}
+.plan .l2{font-size:24px;font-weight:500;fill:var(--muted)}
+.plan .wb circle{fill:var(--surface);stroke:var(--accent);stroke-width:3}
+.plan .wb text{fill:var(--accent);font-family:var(--mono);font-size:20px;font-weight:600}
+.plan .win{fill:var(--surface);stroke:var(--wall);stroke-width:2}
+.rrow{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:13px;cursor:pointer;color:var(--ink);font:inherit;text-align:left;width:100%}
+.rrow .n{flex:1;min-width:0;font-weight:600}
+.line{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.line.todo{border-left:4px solid var(--warn)}
+.lh{display:flex;gap:10px;align-items:flex-start}
+.lh .no{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:22px;padding-top:2px}
+.lh b{display:block}
+.lh small{color:var(--muted);font-size:13.5px}
+.seg{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:6px}
+.seg button{min-height:50px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:700;cursor:pointer}
+.seg button[data-v="ok"][aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.seg button[data-v="nok"][aria-pressed="true"]{background:var(--nok);border-color:var(--nok);color:var(--surface)}
+.seg button[data-v="na"][aria-pressed="true"]{background:var(--na);border-color:var(--na);color:var(--surface)}
+.det{display:flex;flex-direction:column;gap:8px;border-top:1px dashed var(--line);padding-top:10px}
+.det .lab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:8px 13px;font:inherit;font-size:14px;cursor:pointer;min-height:38px}
+.chip[aria-pressed="true"]{background:var(--nok-soft);border-color:var(--nok);color:var(--nok);font-weight:600}
+.chip.w{font-family:var(--mono)}
+.chip.flag[aria-pressed="true"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.photos{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ph{position:relative}
+.ph img{width:76px;height:76px;object-fit:cover;border-radius:9px;border:1px solid var(--line);display:block;background:var(--na-soft)}
+.ph button{position:absolute;top:-8px;right:-8px;width:26px;height:26px;border-radius:50%;border:0;background:var(--ink);color:var(--surface);font-size:14px;cursor:pointer}
+.addph{display:inline-flex;align-items:center;justify-content:center;width:76px;height:76px;border:1.5px dashed var(--line);border-radius:9px;color:var(--muted);font-size:12.5px;text-align:center;cursor:pointer;position:relative}
+.addph input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.dock .in{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;display:flex;gap:10px;align-items:center}
+.dock .info{flex:1;min-width:0;font-size:13.5px;color:var(--muted)}
+.dock .info b{color:var(--ink);display:block;font-size:15px}
+.pad{background:#fff;border:1.5px solid var(--line);border-radius:10px;touch-action:none;width:100%;height:200px;display:block}
+.sigshow{background:#fff;border:1px solid var(--line);border-radius:8px;max-width:280px;width:100%}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.step{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.08em}
+.note{background:var(--warn-soft);border-radius:10px;padding:10px 12px;font-size:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:10px 14px;border-radius:10px;z-index:30;font-size:14px;max-width:90vw}
+.overlay{position:fixed;inset:0;background:rgba(10,14,20,.62);z-index:20;display:flex;align-items:center;justify-content:center;padding:16px}
+.overlay img{max-width:100%;max-height:85vh;border-radius:8px}
+.muted{color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head><body>
+
+<header class="top"><div class="in">
+  <button class="back" id="backBtn" aria-label="Back" hidden>‹</button>
+  <div class="ttl"><span class="app">HERAKLES JOINT INSPECTION APP</span><b id="hTitle">HUS B</b></div>
+</div></header>
+<main class="wrap" id="app"><p class="muted">Loading…</p></main>
+<div class="dock" id="dock" hidden><div class="in" id="dockIn"></div></div>
+
+<script>
+(function(){
+"use strict";
+/* ===== project data ===== */
+const APTS=[
+ {id:"1113-1114",plan:11,lgh:"1110",typ:"14A",bq:"1113",bp:"1114"},
+ {id:"1115-1116",plan:11,lgh:"1109",typ:"14A",bq:"1115",bp:"1116"},
+ {id:"1117-1118",plan:11,lgh:"1108",typ:"14A",bq:"1117",bp:"1118"},
+ {id:"1213-1214",plan:12,lgh:"1214",typ:"14B",bq:"1213",bp:"1214"},
+ {id:"1215-1216",plan:12,lgh:"1213",typ:"14B",bq:"1215",bp:"1216"},
+ {id:"1217-1218",plan:12,lgh:"1212",typ:"14B",bq:"1217",bp:"1218"}];
+const DOOR="closing · leaf · frame · frame cover · frame cover 45° joint",SKIRT="gap wall/skirting · gap floor/skirting · paint spots",
+ FLOOR="movement · scratch / spacing / water (SC, SP, W) · floor cut too short",WALLS="W1 · W2 · W3 · W4",CEIL="ceiling · ceiling accessories complete",
+ RAD="installed · thermostat moving",WIN="opening / closing · handle · glass (scratch / crack) · frame & gasket · window sill",
+ BAL="opening / closing · handle · glass (scratch / crack) · frame & gasket · threshold";
+const ROOMS=[
+ {k:"hall",name:"Entrance / Hall",items:[["Entrance door","closing · gasket · wooden threshold list · silicone · door frame"],["Wood floor","wood floor OK at entrance door"],["Skirting",SKIRT],["Clothes hanger","fixed · OK"],["Walls",WALLS],["Bathroom door (hall side)",DOOR],["FRD door",DOOR]]},
+ {k:"frd",name:"FRD (storage)",items:[["Skirting",SKIRT],["Floor",FLOOR],["Painting",WALLS],["Ceiling",CEIL],["Distribution board","OK"],["Storage rack (if installed)","fixed · complete · undamaged"]]},
+ {k:"bath",name:"Bathroom",items:[["Floor tiles","OK"],["Wall tiles","W1 · W1-W2 · W2 · W2-W3 · W3 · W3-W4 · W4 · W4-W1"],["Ceiling & LK box","OK"],["Sink","fixing OK"],["Tap","installed · moving / tightened"],["Mirror","OK"],["Shower","head support · head installed · tap fixing · tap dirty"],["Shower glass","OK"],["Radiator","fixed · level · clean"],["Toilet","seat & basin OK"],["Bathroom door","closing · leaf · frame · outside frame · outside frame 45° joint"],["Threshold","side gaps · silicone · crack"],["Ventilation unit","connection · connection box"],["Cabinet","OK"]]},
+ {k:"kitchen",name:"Kitchen",items:[["Skirting",SKIRT],["Floor",FLOOR],["Control panel in the cabinet","OK"],["Kitchen top","scratches · cracks · silicone"],["Backsplash","connection · scratches · cracks · silicone · silicone wall to furniture (L/R)"],["Furniture","OK"],["Tap & sink","tap installed · tap moving / tightened · sink fixing"],["Dishwasher hole","OK"],["Walls",WALLS],["Ceiling",CEIL]]},
+ {k:"living",name:"Living room",items:[["Window",WIN],["Balcony door",BAL],["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD]]},
+ {k:"bed1",name:"Bedroom 1",items:[["Bedroom 1 door",DOOR],["Window",WIN],["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD],["Furniture","OK"]]},
+ {k:"bed2",name:"Bedroom 2",items:[["Bedroom 2 door",DOOR],["Window",WIN],["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD],["Furniture","OK"]]},
+ {k:"shaft",name:"Pipe shaft",items:[["Pipe shaft","closed"],["Fire seal around conduits","OK"]]}];
+const TAGS=["Scratch","Crack","Gap","Paint","Silicone","Damaged","Missing","Loose","Water","Dirty"];
+const STL={ok:"OK",nok:"NOT OK",na:"N/A"};
+const POLY={living:"330,300 685,300 685,724 330,724",kitchen:"330,724 685,724 685,850 925,850 925,1065 330,1065",bed2:"685,300 925,300 925,705 685,705",
+ bed1:"930,300 1272,300 1272,775 1075,775 1075,705 930,705",frd:"685,740 920,740 920,850 685,850",hall:"925,705 1075,705 1075,790 1068,790 1068,1065 925,1065",bath:"1068,790 1272,790 1272,1065 1068,1065"};
+const LAB={living:[505,520,"Living room"],kitchen:[520,960,"Kitchen"],bed2:[805,470,"Bedroom 2"],bed1:[1100,470,"Bedroom 1"],frd:[800,808,"FRD"],hall:[996,880,"Hall"],bath:[1170,940,"Bath"]};
+const WB={living:[[450,1035],[360,700],[505,338],[650,600]],kitchen:[[450,1035],[360,700],[505,338],[650,600]],bed2:[[805,338],[895,560],[805,672],[715,400]],
+ bed1:[[960,420],[1100,338],[1242,500],[1170,680]],frd:[[712,800],[752,765],[893,795],[820,828]],hall:[[950,905],[1045,730],[1045,1000],[970,1035]],bath:[[1170,822],[1242,930],[1170,1035],[1098,930]]};
+const COMPANIES=["TLC","NT"];
+
+/* ===== storage on the phone (IndexedDB, memory fallback) ===== */
+const mem={insp:{},photos:{},kv:{}};let idb=null;
+function openDB(){return new Promise(res=>{try{const r=indexedDB.open("herakles-inspection",1);r.onupgradeneeded=()=>{const d=r.result;["insp","photos","kv"].forEach(s=>{if(!d.objectStoreNames.contains(s))d.createObjectStore(s)})};
+ r.onsuccess=()=>{idb=r.result;res(true)};r.onerror=()=>res(false)}catch(e){res(false)}})}
+function put(store,key,val){mem[store][key]=val;if(!idb)return Promise.resolve();return new Promise(res=>{try{const t=idb.transaction(store,"readwrite");t.objectStore(store).put(val,key);t.oncomplete=()=>res();t.onerror=()=>{toast("Could not save on this phone – storage full?");res()}}catch(e){res()}})}
+function del(store,key){delete mem[store][key];if(!idb)return Promise.resolve();return new Promise(res=>{try{const t=idb.transaction(store,"readwrite");t.objectStore(store).delete(key);t.oncomplete=()=>res();t.onerror=()=>res()}catch(e){res()}})}
+function loadAll(store){if(!idb)return Promise.resolve();return new Promise(res=>{try{const t=idb.transaction(store,"readonly");const s=t.objectStore(store);const rq=s.openCursor();rq.onsuccess=()=>{const c=rq.result;if(c){mem[store][c.key]=c.value;c.continue()}else res()};rq.onerror=()=>res()}catch(e){res()}})}
+
+/* ===== helpers ===== */
+const $app=document.getElementById("app");
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2600)}
+const aptById=id=>APTS.find(a=>a.id===id);const roomByK=k=>ROOMS.find(r=>r.k===k);
+const me=()=>mem.kv.me||null;
+function insp(a){if(!mem.insp[a])mem.insp[a]={apt:a,lines:{},signs:{},startedAt:null,signedAt:null,sharedAt:null};return mem.insp[a]}
+const save=a=>put("insp",a,insp(a));
+const L=(a,r,i)=>insp(a).lines[r+":"+i]||null;
+function roomStat(a,r){const R=roomByK(r);let done=0,nok=0,flag=0;R.items.forEach((_,ix)=>{const l=L(a,r,ix+1);if(l&&l.s)done++;if(l&&l.s==="nok")nok++;if(l&&l.flag)flag++});
+ return {n:R.items.length,done,nok,flag,complete:done===R.items.length,cls:done===R.items.length?(nok?"s-nok":"s-done"):done?"s-prog":""}}
+function aptStat(a){let rooms=ROOMS.length,complete=0,nok=0,flag=0,lines=0,done=0;ROOMS.forEach(R=>{const s=roomStat(a,R.k);if(s.complete)complete++;nok+=s.nok;flag+=s.flag;lines+=s.n;done+=s.done});
+ const I=mem.insp[a];return {rooms,complete,nok,flag,lines,done,signed:!!(I&&I.signedAt),shared:!!(I&&I.sharedAt),started:!!(I&&done)}}
+const locked=a=>!!insp(a).signedAt;
+
+/* ===== header / dock ===== */
+function header(title,back){document.getElementById("hTitle").textContent=title;const b=document.getElementById("backBtn");b.hidden=!back;b.onclick=()=>{location.hash=back==="home"?"":back}}
+function dock(html){const d=document.getElementById("dock");if(!html){d.hidden=true;return}d.hidden=false;document.getElementById("dockIn").innerHTML=html}
+
+/* ===== plan drawing ===== */
+function planSVG(a,sel){let s=`<svg viewBox="300 250 1010 880" role="img" aria-label="Floor plan; tap a room">`;
+ s+=`<text x="801" y="282" text-anchor="middle" class="l2">FAÇADE (windows)</text><text x="801" y="1112" text-anchor="middle" class="l2">CORRIDOR · ENTRANCE ↑</text>`;
+ for(const k in POLY){const c=sel?((k===sel||(sel==="living"&&k==="kitchen")||(sel==="kitchen"&&k==="living"))?(k===sel?"sel":""):"dim"):roomStat(a,k).cls;
+  s+=`<polygon class="rm ${c}" points="${POLY[k]}" data-room="${k}" tabindex="0" role="button" aria-label="${esc(LAB[k][2])}"></polygon>`}
+ [[390,510],[515,620],[740,865],[985,1215]].forEach(([x1,x2])=>{s+=`<rect class="win" x="${x1}" y="292" width="${x2-x1}" height="16"></rect>`});
+ for(const k in LAB){if(sel&&k!==sel&&!((sel==="kitchen"&&k==="living")||(sel==="living"&&k==="kitchen")))continue;s+=`<text x="${LAB[k][0]}" y="${LAB[k][1]}" text-anchor="middle">${LAB[k][2]}</text>`}
+ if(sel&&WB[sel])WB[sel].forEach(([x,y],i)=>{s+=`<g class="wb"><circle cx="${x}" cy="${y}" r="25"></circle><text x="${x}" y="${y+7}" text-anchor="middle">W${i+1}</text></g>`});
+ return s+"</svg>"}
+
+/* ===== views ===== */
+function viewSetup(){header("Who is recording?",me()?"home":null);dock(null);const m=me()||{name:"",company:""};
+ $app.innerHTML=`<h1>Your name</h1><p class="sub">Saved on this phone and printed on every report you make.</p>
+ <div class="field"><label for="nm">Name</label><input type="text" id="nm" autocomplete="name" value="${esc(m.name)}" placeholder="e.g. Dan Ardeleanu"></div>
+ <div class="field"><label>Company</label><div class="choice">${COMPANIES.map(c=>`<button data-co="${c}" aria-pressed="${m.company===c}">${c}</button>`).join("")}</div></div>
+ <button class="btn primary wide" id="saveMe">Continue</button>`;
+ let co=m.company;$app.querySelectorAll("[data-co]").forEach(b=>b.onclick=()=>{co=b.dataset.co;$app.querySelectorAll("[data-co]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+ document.getElementById("saveMe").onclick=()=>{const name=document.getElementById("nm").value.trim();if(!name){toast("Type your name");return}if(!co){toast("Choose TLC or NT");return}
+  mem.kv.me={name,company:co};put("kv","me",mem.kv.me);location.hash="";route()}}
+
+function viewHome(){header("HUS B · Plans 11–12",null);const m=me();
+ let h=`<div class="row" style="justify-content:space-between"><p class="sub" style="margin:0">Recording as <b>${esc(m.name)}</b> (${esc(m.company)})</p><button class="btn" id="chg" style="min-height:38px;padding:6px 12px">Change</button></div><h2>Apartments</h2><div class="list">`;
+ APTS.forEach(A=>{const s=aptStat(A.id);const pct=Math.round(100*s.complete/s.rooms);
+  const state=s.shared?`<span class="pill ok">Report shared</span>`:s.signed?`<span class="pill ok">Signed</span>`:s.started?`<span class="pill acc">${s.complete}/${s.rooms} rooms</span>`:`<span class="pill">Not started</span>`;
+  h+=`<button class="card" data-apt="${A.id}"><span class="k">PLAN ${A.plan} · TYP ${A.typ} · MODULES ${A.bq}+${A.bp}</span><span class="big">LGH ${A.lgh}</span>
+   <span class="bar"><i style="width:${pct}%"></i></span><span class="pills">${state}${s.nok?`<span class="pill nok">${s.nok} not OK</span>`:""}${s.flag?`<span class="pill warn">${s.flag} not agreed</span>`:""}</span></button>`});
+ $app.innerHTML=h+`</div><p class="muted" style="margin-top:18px;font-size:13.5px">Everything is stored on this phone until you share the signed report. One phone per apartment.</p>`;
+ document.getElementById("chg").onclick=()=>{location.hash="me"};dock(null)}
+
+function viewApt(a){const A=aptById(a);header("LGH "+A.lgh,"home");const s=aptStat(a);const I=insp(a);
+ let h=`<p class="sub">Plan ${A.plan} · modules ${A.bq} (BQ) + ${A.bp} (BP) · TYP ${A.typ}</p>`;
+ if(I.signedAt)h+=`<div class="note">Signed ${new Date(I.signedAt).toLocaleString()}. The answers are locked.</div>`;
+ h+=`<div class="plan" style="margin-top:10px">${planSVG(a,null)}</div><div class="list" style="margin-top:12px">`;
+ ROOMS.forEach(R=>{const st=roomStat(a,R.k);const p=st.complete?`<span class="pill ${st.nok?"nok":"ok"}">${st.nok?st.nok+" not OK":"Done"}</span>`:st.done?`<span class="pill acc">${st.done}/${st.n}</span>`:`<span class="pill">${st.n} points</span>`;
+  h+=`<button class="rrow" data-room="${R.k}"><span class="n">${esc(R.name)}</span><span class="pills">${p}${st.flag?`<span class="pill warn">${st.flag} ⚑</span>`:""}</span></button>`});
+ h+=`</div>`;
+ if(I.signedAt)h+=`<h2>After sharing</h2><div class="row"><button class="btn" id="reopen">Reopen (removes signatures)</button><button class="btn danger" id="clear">Delete from this phone</button></div><div id="confirm"></div>`;
+ $app.innerHTML=h;
+ const ready=s.complete===s.rooms;
+ if(I.signedAt)dock(`<div class="info"><b>Signed</b>${s.nok} not OK · ${s.flag} not agreed</div><button class="btn primary" id="share">Share report</button>`);
+ else dock(`<div class="info"><b>${s.complete}/${s.rooms} rooms complete</b>${ready?"Ready to sign":"Fill all points in every room"}</div><button class="btn go" id="sign"${ready?"":" disabled"}>Sign inspection</button>`);
+ const sb=document.getElementById("sign");if(sb)sb.onclick=()=>{location.hash="sign-"+a};
+ const sh=document.getElementById("share");if(sh)sh.onclick=()=>shareReport(a);
+ const ro=document.getElementById("reopen");if(ro)ro.onclick=()=>confirmBox("Reopen this inspection? Both signatures are removed and must be given again.","Reopen",()=>{I.signedAt=null;I.signs={};I.sharedAt=null;save(a);route()});
+ const cl=document.getElementById("clear");if(cl)cl.onclick=()=>confirmBox(I.sharedAt?"Delete this inspection and its photos from this phone? Only do this after the report reached everyone.":"The report was not shared yet. Delete anyway? Everything for this apartment is lost.","Delete",async()=>{for(const k in I.lines)for(const p of (I.lines[k].photos||[]))await del("photos",p);delete mem.insp[a];await del("insp",a);location.hash=""})}
+function confirmBox(text,label,fn){const c=document.getElementById("confirm");c.innerHTML=`<div class="box" style="margin-top:10px"><span>${esc(text)}</span><div class="row"><button class="btn" id="cNo">Cancel</button><button class="btn danger" id="cYes">${esc(label)}</button></div></div>`;
+ document.getElementById("cNo").onclick=()=>{c.innerHTML=""};document.getElementById("cYes").onclick=fn}
+
+function viewRoom(a,r){const A=aptById(a),R=roomByK(r);header(R.name,"a-"+a);const lk=locked(a);const st=roomStat(a,r);
+ let h=`<p class="sub">LGH ${A.lgh} · ${A.bq}+${A.bp}</p>`;
+ if(POLY[r])h+=`<div class="plan">${planSVG(a,r)}</div><p class="muted" style="font-size:13.5px;margin:6px 0 12px">Stand in the doorway facing into the room: W1 is the wall on your left, then clockwise; W4 is the wall with the door.</p>`;
+ if(lk)h+=`<div class="note">This inspection is signed. Reopen it from the apartment page to change answers.</div>`;
+ h+=`<div class="list">`;
+ R.items.forEach(([el,chk],ix)=>{const i=ix+1;const l=L(a,r,i)||{};
+  h+=`<div class="line${l.s?"":" todo"}" data-item="${i}"><div class="lh"><span class="no">${i}</span><div><b>${esc(el)}</b><small>${esc(chk)}</small></div></div>
+  <div class="seg" role="group" aria-label="Result">${["ok","nok","na"].map(v=>`<button data-v="${v}" aria-pressed="${l.s===v}"${lk?" disabled":""}>${STL[v]}</button>`).join("")}</div>`;
+  if(l.s==="nok"){h+=`<div class="det"><span class="lab">Wall</span><div class="chips">${["W1","W2","W3","W4"].map(w=>`<button class="chip w" data-wall="${w}" aria-pressed="${(l.walls||[]).includes(w)}"${lk?" disabled":""}>${w}</button>`).join("")}</div>
+   <span class="lab">Defect</span><div class="chips">${TAGS.map(t=>`<button class="chip" data-tag="${t}" aria-pressed="${(l.tags||[]).includes(t)}"${lk?" disabled":""}>${t}</button>`).join("")}</div>
+   <label class="lab" for="n${i}">Note</label><textarea id="n${i}" data-note="${i}" placeholder="What exactly, where"${lk?" disabled":""}>${esc(l.note||"")}</textarea>
+   <span class="lab">Photos</span><div class="photos">${(l.photos||[]).map(p=>`<span class="ph"><img data-big="${p}" alt="Defect photo" src="${photoURL(p)}">${lk?"":`<button data-delph="${p}" aria-label="Remove photo">×</button>`}</span>`).join("")}${lk?"":`<span class="addph">+ Photo<input type="file" accept="image/*" capture="environment" data-photo="${i}" aria-label="Take photo"></span>`}</div></div>`}
+  if(l.s)h+=`<div><button class="chip flag" data-flag="1" aria-pressed="${!!l.flag}"${lk?" disabled":""}>⚑ Not agreed by the other company</button></div>`;
+  h+=`</div>`});
+ $app.innerHTML=h+`</div>`;
+ dock(lk?null:`<div class="info"><b>${st.done}/${st.n} points</b>${st.complete?"Room complete":(st.n-st.done)+" left"}</div><button class="btn" id="restOk"${st.complete?" disabled":""}>Rest OK</button><button class="btn primary" id="doneRoom">${st.complete?"Next room":"Back to plan"}</button>`);
+ const ro=document.getElementById("restOk");if(ro)ro.onclick=()=>{R.items.forEach((_,ix)=>{const k=r+":"+(ix+1);if(!insp(a).lines[k]||!insp(a).lines[k].s)setLine(a,r,ix+1,{s:"ok"},true)});save(a);rerender();toast("Remaining points marked OK")};
+ const dr=document.getElementById("doneRoom");if(dr)dr.onclick=()=>{if(st.complete){const nx=ROOMS.find(x=>!roomStat(a,x.k).complete);location.hash=nx?`r-${a}-${nx.k}`:"a-"+a}else location.hash="a-"+a}}
+
+const urlCache={};function photoURL(id){if(urlCache[id])return urlCache[id];const b=mem.photos[id];if(!b)return "";urlCache[id]=URL.createObjectURL(b);return urlCache[id]}
+function setLine(a,r,i,patch,noSave){const I=insp(a);if(!I.startedAt)I.startedAt=Date.now();const k=r+":"+i;I.lines[k]=Object.assign({s:null,walls:[],tags:[],note:"",photos:[],flag:false},I.lines[k]||{},patch,{at:Date.now()});if(!noSave)save(a)}
+
+function viewSign(a){const A=aptById(a);header("Sign LGH "+A.lgh,"a-"+a);const I=insp(a);const s=aptStat(a);const m=me();
+ if(s.complete<s.rooms){location.hash="a-"+a;return}
+ if(I.signedAt){location.hash="a-"+a;return}
+ const other=m.company==="TLC"?"NT":"TLC";const step=I.signs.rec?2:1;
+ let h=`<div class="box"><b>Summary</b><span>${s.lines} points checked · <b style="color:var(--nok)">${s.nok} not OK</b> · ${s.flag} not agreed</span></div>`;
+ if(step===1){h+=`<h2><span class="step">STEP 1 OF 2</span><br>Recorder signs</h2><p class="sub">${esc(m.name)} (${esc(m.company)}) confirms the inspection of LGH ${A.lgh} was done jointly and every point is recorded.</p>
+  <canvas class="pad" id="pad" aria-label="Signature pad"></canvas><div class="row" style="margin-top:8px"><button class="btn" id="clr">Clear</button></div>`;
+  dock(`<div class="info"><b>Step 1 of 2</b>Sign with your finger</div><button class="btn go" id="ok" disabled>Sign</button>`)}
+ else{h+=`<div class="box"><span class="muted">Signed by</span><b>${esc(I.signs.rec.name)} (${esc(I.signs.rec.company)})</b><img class="sigshow" src="${I.signs.rec.sig}" alt="Recorder signature"></div>
+  <h2><span class="step">STEP 2 OF 2</span><br>Hand the phone to the person from ${other}</h2>
+  <div class="field"><label for="on">Name</label><input type="text" id="on" placeholder="Name of the ${other} inspector"></div>
+  <div class="field"><label>Company</label><div class="choice">${COMPANIES.map(c=>`<button data-co="${c}" aria-pressed="${c===other}">${c}</button>`).join("")}</div></div>
+  <canvas class="pad" id="pad" aria-label="Signature pad"></canvas><div class="row" style="margin-top:8px"><button class="btn" id="clr">Clear</button><button class="btn" id="redo">Recorder signs again</button></div>`;
+  dock(`<div class="info"><b>Step 2 of 2</b>Name and signature</div><button class="btn go" id="ok" disabled>Sign &amp; lock</button>`)}
+ $app.innerHTML=h;let co=other;$app.querySelectorAll("[data-co]").forEach(b=>b.onclick=()=>{co=b.dataset.co;$app.querySelectorAll("[data-co]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+ const pad=makePad(document.getElementById("pad"),()=>{document.getElementById("ok").disabled=false});
+ document.getElementById("clr").onclick=()=>{pad.clear();document.getElementById("ok").disabled=true};
+ const rd=document.getElementById("redo");if(rd)rd.onclick=()=>{delete I.signs.rec;save(a);route()};
+ document.getElementById("ok").onclick=()=>{if(step===1){I.signs.rec={name:m.name,company:m.company,sig:pad.png(),at:Date.now()};save(a);window.scrollTo(0,0);route()}
+  else{const nm=document.getElementById("on").value.trim();if(!nm){toast("Type the name of the person signing");return}I.signs.other={name:nm,company:co,sig:pad.png(),at:Date.now()};I.signedAt=Date.now();save(a);location.hash="a-"+a;toast("Inspection signed and locked")}}}
+function makePad(c,onInk){const dpr=window.devicePixelRatio||1;const rc=c.getBoundingClientRect();c.width=rc.width*dpr;c.height=rc.height*dpr;const g=c.getContext("2d");g.scale(dpr,dpr);
+ g.lineWidth=2.6;g.lineCap="round";g.lineJoin="round";g.strokeStyle="#111";let dn=false,last=null,ink=false;const pt=e=>{const b=c.getBoundingClientRect();return [e.clientX-b.left,e.clientY-b.top]};
+ c.addEventListener("pointerdown",e=>{dn=true;last=pt(e);try{c.setPointerCapture(e.pointerId)}catch(x){}});
+ c.addEventListener("pointermove",e=>{if(!dn)return;const p=pt(e);g.beginPath();g.moveTo(last[0],last[1]);g.lineTo(p[0],p[1]);g.stroke();last=p;if(!ink){ink=true;onInk()}});
+ c.addEventListener("pointerup",()=>{dn=false});c.addEventListener("pointercancel",()=>{dn=false});
+ return {clear(){g.clearRect(0,0,c.width,c.height);ink=false},png(){const o=document.createElement("canvas");o.width=480;o.height=Math.round(480*rc.height/rc.width);const og=o.getContext("2d");og.fillStyle="#fff";og.fillRect(0,0,o.width,o.height);og.drawImage(c,0,0,o.width,o.height);return o.toDataURL("image/png")}}}
+
+/* ===== interactions in room view ===== */
+function curAR(){const m=location.hash.slice(1).match(/^r-(\d{4}-\d{4})-([a-z0-9]+)$/);return m?[m[1],m[2]]:null}
+$app.addEventListener("click",e=>{const t=e.target.closest("button,[data-room],img[data-big]");if(!t)return;
+ if(t.dataset.apt){location.hash="a-"+t.dataset.apt;return}
+ if(t.dataset.big){const o=document.createElement("div");o.className="overlay";o.innerHTML=`<img src="${photoURL(t.dataset.big)}" alt="Defect photo">`;o.onclick=()=>o.remove();document.body.appendChild(o);return}
+ const ar=curAR();
+ if(t.dataset.room&&!ar){const m=location.hash.match(/^#a-(\d{4}-\d{4})$/);if(m)location.hash=`r-${m[1]}-${t.dataset.room}`;return}
+ if(!ar||locked(ar[0]))return;const [a,r]=ar;const line=t.closest(".line");const i=line?+line.dataset.item:0;if(!i)return;const l=L(a,r,i)||{};
+ if(t.dataset.v){if(l.s===t.dataset.v)return;setLine(a,r,i,t.dataset.v==="nok"?{s:"nok"}:{s:t.dataset.v,walls:[],tags:[]});rerender();return}
+ if(t.dataset.wall){const w=new Set(l.walls||[]);w.has(t.dataset.wall)?w.delete(t.dataset.wall):w.add(t.dataset.wall);setLine(a,r,i,{walls:[...w].sort()});rerender();return}
+ if(t.dataset.tag){const w=new Set(l.tags||[]);w.has(t.dataset.tag)?w.delete(t.dataset.tag):w.add(t.dataset.tag);setLine(a,r,i,{tags:[...w]});rerender();return}
+ if(t.dataset.flag){setLine(a,r,i,{flag:!l.flag});rerender();return}
+ if(t.dataset.delph){setLine(a,r,i,{photos:(l.photos||[]).filter(p=>p!==t.dataset.delph)});del("photos",t.dataset.delph);rerender();return}});
+$app.addEventListener("keydown",e=>{const p=e.target.closest&&e.target.closest("polygon[data-room]");if(p&&(e.key==="Enter"||e.key===" ")){e.preventDefault();p.dispatchEvent(new MouseEvent("click",{bubbles:true}))}});
+$app.addEventListener("input",e=>{const ta=e.target.closest("textarea[data-note]");if(!ta)return;const ar=curAR();if(ar)setLine(ar[0],ar[1],+ta.dataset.note,{note:ta.value})});
+$app.addEventListener("change",async e=>{const inp=e.target.closest("input[data-photo]");if(!inp||!inp.files||!inp.files[0])return;const ar=curAR();const i=+inp.dataset.photo;
+ try{const blob=await shrink(inp.files[0]);const id="p"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);await put("photos",id,blob);const l=L(ar[0],ar[1],i)||{};setLine(ar[0],ar[1],i,{photos:[...(l.photos||[]),id]});rerender()}
+ catch(err){toast("Photo could not be read – try again")}});
+async function shrink(file){const url=URL.createObjectURL(file);try{const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=url});
+ const k=Math.min(1,1400/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);
+ c.getContext("2d").drawImage(img,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(b=>r(b||file),"image/jpeg",0.75))}finally{URL.revokeObjectURL(url)}}
+function rerender(){const y=window.scrollY;const ae=document.activeElement;if(ae&&ae.tagName==="TEXTAREA")return;route();window.scrollTo(0,y)}
+$app.addEventListener("focusout",e=>{if(e.target.tagName==="TEXTAREA")setTimeout(rerender,30)});
+
+/* ===== report (PDF) ===== */
+const pdfTxt=s=>String(s==null?"":s).replace(/→/g,"->").replace(/[^\x20-\x7E -ÿ–—‘’“”•…]/g,"");
+function blobToDataURL(b){return new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)})}
+function imgSize(src){return new Promise(r=>{const i=new Image();i.onload=()=>r([i.naturalWidth,i.naturalHeight]);i.onerror=()=>r([4,3]);i.src=src})}
+function planPNG(a){return new Promise(res=>{const col={"s-done":"#dff1e6","s-nok":"#fbe4e1","s-prog":"#e2ecf8","":"#ffffff"};
+ let s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="300 250 1010 880" width="1010" height="880"><rect x="300" y="250" width="1010" height="880" fill="#ffffff"/>`;
+ for(const k in POLY)s+=`<polygon points="${POLY[k]}" fill="${col[roomStat(a,k).cls]}" stroke="#17202a" stroke-width="5"/>`;
+ [[390,510],[515,620],[740,865],[985,1215]].forEach(([x1,x2])=>{s+=`<rect x="${x1}" y="292" width="${x2-x1}" height="16" fill="#fff" stroke="#17202a" stroke-width="2"/>`});
+ for(const k in LAB){const st=roomStat(a,k);s+=`<text x="${LAB[k][0]}" y="${LAB[k][1]}" text-anchor="middle" font-family="Arial,sans-serif" font-size="32" font-weight="bold" fill="#17202a">${LAB[k][2]}</text>`;
+  if(st.nok)s+=`<text x="${LAB[k][0]}" y="${LAB[k][1]+38}" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" fill="#b42318">${st.nok} not OK</text>`}
+ s+=`<text x="801" y="282" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" fill="#5b6977">FACADE</text><text x="801" y="1112" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" fill="#5b6977">CORRIDOR</text></svg>`;
+ const img=new Image();img.onload=()=>{const c=document.createElement("canvas");c.width=1010;c.height=880;c.getContext("2d").drawImage(img,0,0);res(c.toDataURL("image/png"))};img.onerror=()=>res(null);
+ img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s)})}
+async function buildPDF(a){const {jsPDF}=window.jspdf;const A=aptById(a),I=insp(a),s=aptStat(a);const doc=new jsPDF({unit:"mm",format:"a4"});const W=210,M=14;
+ const dt=d=>d?new Date(d).toLocaleString():"";
+ doc.setFillColor(31,95,168);doc.rect(0,0,W,24,"F");doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(9);doc.text("HERAKLES JOINT INSPECTION APP",M,9);
+ doc.setFontSize(15);doc.text(pdfTxt(`HUS B – LGH ${A.lgh} – modules ${A.bq} (BQ) + ${A.bp} (BP)`),M,18);doc.setTextColor(23,32,42);
+ doc.setFont("helvetica","normal");doc.setFontSize(10);
+ const info=[["Project","Herakles, Gävle – HUS B, Plan "+A.plan+", apartment type "+A.typ+" (3 RoK, 55 m2)"],["Inspection","Joint visual inspection TLC + NT"],["Started",dt(I.startedAt)],["Signed",dt(I.signedAt)],
+  ["Recorder",`${I.signs.rec.name} (${I.signs.rec.company})`],["Countersigned",`${I.signs.other.name} (${I.signs.other.company})`],["Result",`${s.lines} points · ${s.nok} not OK · ${s.flag} not agreed`]];
+ doc.autoTable({startY:30,body:info.map(r=>r.map(pdfTxt)),theme:"plain",styles:{fontSize:9.5,cellPadding:1.2},columnStyles:{0:{fontStyle:"bold",cellWidth:32}},margin:{left:M,right:M}});
+ let y=doc.lastAutoTable.finalY+4;const plan=await planPNG(a);if(plan){doc.addImage(plan,"PNG",M+20,y,142,124);y+=128}
+ doc.setFontSize(8.5);doc.setTextColor(91,105,119);doc.text(pdfTxt("Walls: standing in the doorway facing into the room, W1 is the wall on the left, then clockwise; W4 is the wall with the door."),M,y+2);doc.setTextColor(23,32,42);
+ doc.addPage();y=16;
+ ROOMS.forEach(R=>{const body=R.items.map(([el,chk],ix)=>{const l=L(a,R.k,ix+1)||{};return [ix+1,pdfTxt(el),STL[l.s]||"",pdfTxt((l.walls||[]).join(", ")),pdfTxt((l.tags||[]).join(", ")),pdfTxt(l.note||""),(l.photos||[]).length||"",l.flag?"NOT AGREED":""]});
+  doc.autoTable({startY:y,head:[[{content:pdfTxt(R.name),colSpan:8,styles:{fillColor:[226,236,248],textColor:[23,32,42],fontStyle:"bold",fontSize:10}}],["No.","Element","Result","Wall","Defect","Note","Photos","Agreed"]],body,
+   theme:"grid",styles:{fontSize:8,cellPadding:1.5,lineColor:[212,219,226],lineWidth:.2,textColor:[23,32,42]},headStyles:{fillColor:[242,244,246],textColor:[91,105,119],fontStyle:"bold"},
+   columnStyles:{0:{cellWidth:9},1:{cellWidth:38},2:{cellWidth:16,fontStyle:"bold"},3:{cellWidth:15},4:{cellWidth:24},5:{cellWidth:"auto"},6:{cellWidth:13},7:{cellWidth:20}},margin:{left:M,right:M},
+   didParseCell:d=>{if(d.section==="body"&&d.column.index===2){if(d.cell.raw==="NOT OK")d.cell.styles.textColor=[180,35,24];else if(d.cell.raw==="OK")d.cell.styles.textColor=[27,119,67]}if(d.section==="body"&&d.column.index===7&&d.cell.raw)d.cell.styles.textColor=[168,98,0]}});
+  y=doc.lastAutoTable.finalY+5});
+ const photos=[];ROOMS.forEach(R=>R.items.forEach(([el],ix)=>{const l=L(a,R.k,ix+1);if(l&&l.photos)l.photos.forEach(p=>photos.push({p,cap:`${R.name} · ${ix+1} ${el}${(l.walls||[]).length?" · "+l.walls.join(", "):""}${(l.tags||[]).length?" · "+l.tags.join(", "):""}`}))}));
+ if(photos.length){doc.addPage();doc.setFont("helvetica","bold");doc.setFontSize(12);doc.text("Photos",M,16);doc.setFont("helvetica","normal");let x=M,py=22,rowH=0;const cw=(W-2*M-6)/2;
+  for(const ph of photos){const b=mem.photos[ph.p];if(!b)continue;const du=await blobToDataURL(b);const [iw,ih]=await imgSize(du);let w=cw,h=cw*ih/iw;if(h>95){h=95;w=h*iw/ih}
+   if(py+h+10>285){doc.addPage();py=16;x=M;rowH=0}doc.addImage(du,"JPEG",x,py,w,h);doc.setFontSize(7.5);doc.text(doc.splitTextToSize(pdfTxt(ph.cap),cw),x,py+h+3.5);rowH=Math.max(rowH,h+10);
+   if(x===M)x=M+cw+6;else{x=M;py+=rowH;rowH=0}}}
+ doc.addPage();doc.setFont("helvetica","bold");doc.setFontSize(12);doc.text("Signatures",M,18);doc.setFont("helvetica","normal");doc.setFontSize(9.5);
+ doc.text(doc.splitTextToSize(pdfTxt(`The undersigned confirm that the visual inspection of LGH ${A.lgh} (modules ${A.bq}+${A.bp}) was carried out jointly and that the results in this report are complete. Points marked NOT AGREED are recorded as disputed by the other company.`),W-2*M),M,26);
+ [["Recorder",I.signs.rec],["Countersigned",I.signs.other]].forEach(([t,sg],k)=>{const x=M+k*92,yy=42;doc.setFont("helvetica","bold");doc.text(t,x,yy);doc.setFont("helvetica","normal");
+  doc.text(pdfTxt(`${sg.name} (${sg.company})`),x,yy+6);doc.text(pdfTxt(dt(sg.at)),x,yy+11);doc.setDrawColor(212,219,226);doc.rect(x,yy+14,84,30);try{doc.addImage(sg.sig,"PNG",x+1,yy+15,82,28)}catch(e){}});
+ const n=doc.getNumberOfPages();for(let p=1;p<=n;p++){doc.setPage(p);doc.setFontSize(7.5);doc.setTextColor(91,105,119);doc.text(pdfTxt(`LGH ${A.lgh} · ${A.bq}+${A.bp} · page ${p} of ${n}`),M,292);doc.text("HERAKLES JOINT INSPECTION APP",W-M,292,{align:"right"})}
+ return doc.output("blob")}
+async function shareReport(a){if(!window.jspdf){toast("The report tool did not load – connect to the internet once and try again.");return}
+ const A=aptById(a);toast("Preparing the report…");let blob;try{blob=await buildPDF(a)}catch(e){toast("The report could not be made.");return}
+ const name=`Herakles inspection LGH ${A.lgh} (${A.bq}+${A.bp}) ${new Date(insp(a).signedAt).toISOString().slice(0,10)}.pdf`;const file=new File([blob],name,{type:"application/pdf"});
+ try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name,text:`Joint inspection report LGH ${A.lgh}, HUS B Herakles`});insp(a).sharedAt=Date.now();save(a);route();return}}catch(e){if(e&&e.name==="AbortError")return}
+ const url=URL.createObjectURL(blob);const lk=document.createElement("a");lk.href=url;lk.download=name;document.body.appendChild(lk);lk.click();lk.remove();
+ insp(a).sharedAt=Date.now();save(a);toast("Report saved to Downloads – send it from there");route()}
+
+/* ===== routing ===== */
+function route(){const h=location.hash.slice(1);let m;
+ if(!me()||h==="me"){viewSetup();return}
+ if((m=h.match(/^r-(\d{4}-\d{4})-([a-z0-9]+)$/))&&aptById(m[1])&&roomByK(m[2]))viewRoom(m[1],m[2]);
+ else if((m=h.match(/^a-(\d{4}-\d{4})$/))&&aptById(m[1]))viewApt(m[1]);
+ else if((m=h.match(/^sign-(\d{4}-\d{4})$/))&&aptById(m[1]))viewSign(m[1]);
+ else viewHome()}
+window.addEventListener("hashchange",()=>{route();window.scrollTo(0,0)});
+
+(async function boot(){await openDB();await Promise.all([loadAll("insp"),loadAll("photos"),loadAll("kv")]);
+ try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+ route()})();
+})();
+</script>
+
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}</script>
+</body></html>
