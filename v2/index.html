@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Herakles Joint Inspection</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1f5fa8">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: plan-first site tool. The apartment plan is the main screen; you only touch the phone when you see a defect. */
+:root{
+  --bg:#f2f4f6; --surface:#ffffff; --ink:#17202a; --muted:#5b6977; --line:#d4dbe2;
+  --accent:#1f5fa8; --accent-ink:#ffffff; --accent-soft:#e2ecf8;
+  --ok:#1b7743; --ok-soft:#dff1e6; --nok:#b42318; --nok-soft:#fbe4e1; --warn:#a86200; --warn-soft:#fcefd6; --na-soft:#eaedf1;
+  --wall:#17202a; --room:#ffffff; --preview:#5b3fa0; --preview-soft:#ece6f8;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151b; --surface:#19212a; --ink:#e6ecf2; --muted:#98a6b4; --line:#2d3945;
+  --accent:#6aa6ec; --accent-ink:#0c1520; --accent-soft:#1c2e44;
+  --ok:#5bc489; --ok-soft:#163225; --nok:#ff8a7d; --nok-soft:#3a1c1a; --warn:#efb448; --warn-soft:#382a11; --na-soft:#242d37;
+  --wall:#e6ecf2; --room:#19212a; --preview:#b9a2f0; --preview-soft:#2a2340; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151b; --surface:#19212a; --ink:#e6ecf2; --muted:#98a6b4; --line:#2d3945;
+  --accent:#6aa6ec; --accent-ink:#0c1520; --accent-soft:#1c2e44;
+  --ok:#5bc489; --ok-soft:#163225; --nok:#ff8a7d; --nok-soft:#3a1c1a; --warn:#efb448; --warn-soft:#382a11; --na-soft:#242d37;
+  --wall:#e6ecf2; --room:#19212a; --preview:#b9a2f0; --preview-soft:#2a2340; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg)}
+body{color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.4}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--accent)}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--accent);color:var(--accent-ink)}
+header.top .in{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;display:flex;align-items:center;gap:10px}
+.back{border:0;background:rgba(255,255,255,.18);color:inherit;border-radius:9px;min-width:42px;height:42px;font-size:22px;cursor:pointer}
+.ttl{flex:1;min-width:0}
+.ttl .app{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;opacity:.85;display:block}
+.ttl b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbtn{border:0;background:rgba(255,255,255,.18);color:inherit;border-radius:9px;height:42px;padding:0 12px;font:inherit;font-weight:600;cursor:pointer}
+.timer{font-family:var(--mono);font-size:15px;font-weight:600;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.18);font-variant-numeric:tabular-nums}
+.timer.late{background:#f7d27a;color:#3b2a00}
+.wrap{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 120px}
+h1{font-size:22px;margin:4px 0 6px;text-wrap:balance} h2{font-size:17px;margin:22px 0 8px;text-wrap:balance}
+.sub{color:var(--muted);margin:0 0 14px}
+.banner{background:var(--preview-soft);color:var(--preview);border-radius:10px;padding:10px 12px;font-size:13.5px;margin-bottom:14px}
+.banner b{color:inherit}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;color:var(--ink);font:inherit;text-align:left;width:100%;display:flex;flex-direction:column;gap:8px;cursor:pointer}
+.list{display:flex;flex-direction:column;gap:10px}
+.k{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+.big{font-size:19px;font-weight:700}
+.bar{height:7px;border-radius:4px;background:var(--na-soft);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok)}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:12.5px;padding:3px 9px;border-radius:999px;background:var(--na-soft);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.nok{background:var(--nok-soft);color:var(--nok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.acc{background:var(--accent-soft);color:var(--accent)} .pill.ex{background:var(--preview-soft);color:var(--preview)}
+.btn{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:11px;padding:12px 16px;font:inherit;font-weight:600;cursor:pointer;min-height:48px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.go{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.btn.danger{color:var(--nok);border-color:var(--nok)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.wide{width:100%}
+button:focus-visible,.card:focus-visible,input:focus-visible,polygon:focus-visible,g:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field label,.lab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+input[type=text]{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px;font:inherit;background:var(--surface);color:var(--ink)}
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choice button{min-height:52px;border-radius:11px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:700;cursor:pointer}
+.choice button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.plan{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px;scroll-margin-top:calc(70px + env(safe-area-inset-top,0px))}
+.plan svg{display:block;width:100%;height:auto;touch-action:manipulation}
+.rm{fill:var(--room);stroke:var(--wall);stroke-width:5;cursor:pointer}
+.rm.done{fill:var(--ok-soft)} .rm.sel{fill:var(--accent-soft);stroke:var(--accent);stroke-width:8} .rm.dim{opacity:.4}
+.plan text{fill:var(--ink);font-family:var(--sans);font-size:32px;font-weight:600;pointer-events:none}
+.plan .l2{font-size:24px;font-weight:500;fill:var(--muted)}
+.plan .cnt circle{fill:var(--nok)} .plan .cnt text{fill:var(--surface);font-family:var(--mono);font-size:26px;font-weight:600}
+.plan .wb{cursor:pointer}
+.plan .wb circle{fill:var(--surface);stroke:var(--accent);stroke-width:4}
+.plan .wb text{fill:var(--accent);font-family:var(--mono);font-size:24px;font-weight:600}
+.plan .wb.hit circle{fill:var(--nok);stroke:var(--nok)} .plan .wb.hit text{fill:var(--surface)}
+.plan .win{fill:var(--surface);stroke:var(--wall);stroke-width:2}
+.plan .heat{fill:var(--nok);pointer-events:none}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.ph-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.ph-row b{font-size:18px}
+.surfs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.surf{position:relative;min-height:64px;border-radius:12px;border:1.5px solid var(--accent);background:var(--accent-soft);color:var(--accent);font:inherit;font-weight:700;font-size:17px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.surf small{font-weight:500;font-size:12px;opacity:.85}
+.surf .n{position:absolute;top:-7px;right:-7px;min-width:24px;height:24px;border-radius:12px;background:var(--nok);color:var(--surface);font-size:13px;display:flex;align-items:center;justify-content:center;padding:0 6px;font-family:var(--mono)}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.dlist{display:flex;flex-direction:column;gap:6px}
+.drow{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer;width:100%}
+.drow img,.drow .noimg{width:48px;height:48px;border-radius:8px;object-fit:cover;flex:none;background:var(--na-soft)}
+.drow .noimg{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted)}
+.drow .t{flex:1;min-width:0}
+.drow .t b{display:block;font-size:14.5px}
+.drow .t span{font-size:12.5px;color:var(--muted)}
+.tag{font-family:var(--mono);font-size:12px;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:2px 6px;flex:none}
+.look{font-size:13px;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px}
+.look b{color:var(--ink);font-weight:600}
+.rooms{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
+.rbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:11px;padding:12px;font:inherit;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:50px;text-align:left}
+.rbtn.done{background:var(--ok-soft);border-color:var(--ok)}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.dock .in{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;display:flex;gap:10px;align-items:center}
+.dock .info{flex:1;min-width:0;font-size:13.5px;color:var(--muted)}
+.dock .info b{color:var(--ink);display:block;font-size:15px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.box.good{border-color:var(--ok);background:var(--ok-soft)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:10px 14px;border-radius:10px;z-index:40;font-size:14px;max-width:90vw}
+.muted{color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+/* capture sheet */
+.sheet{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.sheet .sh-head{background:var(--accent);color:var(--accent-ink)}
+.sheet .sh-head .in,.sheet .sh-body,.sheet .sh-foot .in{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet .sh-head .in{display:flex;align-items:center;gap:10px;padding-block:10px}
+.sheet .sh-scroll{flex:1;overflow-y:auto}
+.sheet .sh-body{padding-block:14px 24px;display:flex;flex-direction:column;gap:14px}
+.sheet .sh-foot{background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet .sh-foot .in{display:flex;gap:10px;padding-block:10px}
+.sheet .sh-foot .btn.primary{flex:1}
+.phbox{display:flex;gap:12px;align-items:center}
+.phbox .th{width:92px;height:92px;border-radius:10px;object-fit:cover;background:var(--na-soft);flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);text-align:center;border:1px solid var(--line)}
+.phbox .st{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.st-ok{color:var(--ok);font-weight:600} .st-wait{color:var(--warn);font-weight:600} .st-err{color:var(--nok);font-weight:600}
+.same{border:1.5px dashed var(--accent);background:var(--surface);color:var(--accent);border-radius:12px;padding:12px 14px;font:inherit;font-weight:600;text-align:left;cursor:pointer;min-height:56px}
+.same span{display:block;font-weight:500;font-size:13px;color:var(--muted)}
+.grp{display:flex;flex-direction:column;gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:9px 14px;font:inherit;font-size:15px;cursor:pointer;min-height:44px}
+.chip[aria-pressed="true"]{background:var(--nok-soft);border-color:var(--nok);color:var(--nok);font-weight:600}
+.chip.el[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.chip.more{color:var(--muted);border-style:dashed}
+.seg3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg3 button{min-height:46px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.seg3 button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.flag{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;text-align:left;cursor:pointer}
+.flag[aria-pressed="true"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn);font-weight:600}
+/* stats */
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+.kpi b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12.5px;color:var(--muted)}
+.hbars{display:flex;flex-direction:column;gap:7px}
+.hb{display:grid;grid-template-columns:minmax(0,1fr) 34px;gap:4px 10px;align-items:center;font-size:14px}
+.hb .lbl{min-width:0}
+.hb .num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hb .trk{grid-column:1 / -1;height:8px;border-radius:4px;background:var(--na-soft);overflow:hidden}
+.hb .trk i{display:block;height:100%;background:var(--nok)}
+.hb .trk i.tr{background:var(--accent)}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+td.z{color:var(--line)}
+td.h1{background:var(--nok-soft);color:var(--nok);font-weight:600}
+td.h2{background:var(--nok);color:var(--surface);font-weight:700}
+.fchips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.fchips .chip{flex:none;min-height:38px;padding:6px 12px;font-size:14px}
+.fchips .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.sys{display:flex;flex-direction:column;gap:6px}
+.sys div{display:flex;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px}
+.sys div b{font-family:var(--mono);color:var(--nok);flex:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* checklist items */
+.mini{max-height:210px;display:flex;justify-content:center}
+.mini svg{width:auto;max-width:100%;height:200px}
+.items{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.item.s-ok{border-color:var(--ok)}
+.item.s-nok{border-color:var(--nok)}
+.ihead{display:flex;align-items:stretch;min-height:58px}
+.iname{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;text-align:left;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.iname b{font-size:16px}
+.iname small{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item.s-nok .iname small{color:var(--nok)}
+.okb{flex:none;width:84px;border:0;border-left:1px solid var(--line);background:var(--surface);color:var(--ok);font:inherit;font-weight:700;font-size:16px;cursor:pointer}
+.okb[aria-pressed="true"]{background:var(--ok);color:var(--surface)}
+.nokb{flex:none;width:84px;border-left:1px solid var(--line);background:var(--nok-soft);color:var(--nok);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px;text-align:center;padding:0 6px}
+.pts{border-top:1px dashed var(--line);padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px}
+.pts .hint{margin-bottom:2px}
+.pt{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;padding:10px 12px;min-height:48px;cursor:pointer;text-align:left}
+.pt .stt{font-size:13px;font-weight:600;color:var(--ok);flex:none}
+.pt.bad{border-color:var(--nok);background:var(--nok-soft)}
+.pt.bad .stt{color:var(--nok)}
+.ddl{display:flex;flex-direction:column;gap:6px;padding:0 12px 12px}
+.pts .ddl{padding:0}
+.nab{flex:none;width:58px;border:0;border-left:1px solid var(--line);background:var(--surface);color:var(--muted);font:inherit;font-weight:700;font-size:14px;cursor:pointer}
+.nab[aria-pressed="true"]{background:var(--warn-soft);color:var(--warn)}
+.item.s-na{border-color:var(--warn)}
+.naw{border-top:1px dashed var(--line);padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px}
+.chip.nac[aria-pressed="true"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.pt.add{border-style:dashed;color:var(--accent);font-weight:600}
+.floorh{display:flex;gap:6px;align-items:baseline;margin-top:18px}
+.floorh .muted{font-size:13px;font-weight:500}
+.phstrip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px}
+.phw{position:relative;flex:none}
+.phw .th{width:84px;height:84px}
+.phx{position:absolute;top:-6px;right:-6px;width:26px;height:26px;border-radius:50%;border:0;background:var(--ink);color:var(--surface);font-size:15px;cursor:pointer}
+.addph2{flex:none;width:84px;height:84px;border-radius:10px;border:1.5px dashed var(--accent);background:var(--accent-soft);color:var(--accent);font:inherit;font-size:26px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.addph2 small{font-size:11.5px;font-weight:600}
+.phbox{flex-direction:column;align-items:stretch;gap:6px}
+.wrule{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.wsvg{width:120px;flex:none}
+.wsvg .wr{fill:var(--accent-soft);stroke:var(--ink);stroke-width:2}
+.wsvg .wd{fill:var(--surface);stroke:var(--ink);stroke-width:1.5}
+.wsvg text{fill:var(--accent);font-family:var(--mono);font-size:10px;font-weight:600;text-anchor:middle}
+.floorh{scroll-margin-top:calc(70px + env(safe-area-inset-top,0px))}
+.plan .blk{fill:var(--na-soft);stroke:var(--line);stroke-width:2}
+.plan rect.rm{stroke-width:4}
+.plan .sk{font-size:30px}
+.plan .skn{fill:var(--surface);font-family:var(--mono);font-size:20px;font-weight:600}
+.plan .skw{font-size:20px}
+.plan .cnt circle{fill:var(--nok)}
+.plan svg{max-height:300px;width:auto;max-width:100%;margin:0 auto}
+.plan.mini svg{max-height:190px}
+.plan .dgap{stroke:var(--room);stroke-width:9;stroke-linecap:butt}
+.plan .dent{stroke:var(--accent);stroke-width:9}
+.plan .dent-a{fill:var(--accent)}
+
+.plan .dopen{stroke:var(--wall);stroke-width:2;stroke-dasharray:6 7;opacity:.6}
+.pad{display:block;width:100%;height:190px;background:#fff;border:1.5px solid var(--line);border-radius:12px;touch-action:none}
+.sigshow{display:block;max-width:240px;width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:8px;margin-top:4px}
+.step{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--accent)}
+.box.warn{border-color:var(--warn);background:var(--warn-soft)}
+</style>
+</head>
+<body>
+
+
+<header class="top"><div class="in">
+  <button class="back" id="backBtn" aria-label="Back" hidden>‹</button>
+  <div class="ttl"><span class="app">HERAKLES JOINT INSPECTION</span><b id="hTitle">HUS B</b></div>
+  <span class="timer" id="timer" hidden>0:00</span>
+  <button class="hbtn" id="hRight" hidden>Statistics</button>
+</div></header>
+<main class="wrap" id="app"><p class="muted">Loading…</p></main>
+<div class="dock" id="dock" hidden><div class="in" id="dockIn"></div></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-label="Record defect"></div>
+<!-- One camera input for the whole app. It is never redrawn, so a photo always finds its way back. -->
+<input type="file" id="cam" class="vh" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
+
+
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="lib/jspdf.plugin.autotable.min.js"></script>
+<script src="lib/xlsx.full.min.js"></script>
+<script>
+(function(){
+"use strict";
+/* ===== project data (same apartments, plan and checklist as the live app) ===== */
+/* HUS B apartment register (105) – from module layouts M-40-P-110…170 + architect plans A-40.1-1110…1710 */
+const APTS=[{"id":"1117-1123","plan":11,"lgh":"1117","typ":"42","rok":1,"m2":24,"mods":"1123","lay":"1R","bal":"none","note":""},{"id":"1101-1121","plan":11,"lgh":"1101","typ":"13","rok":2,"m2":34,"mods":"1121+1122","lay":"2R","bal":"none","note":""},{"id":"1102-1119","plan":11,"lgh":"1102","typ":"14A","rok":3,"m2":55,"mods":"1119+1120","lay":"3R","bal":"balcony","note":""},{"id":"1108-1117","plan":11,"lgh":"1108","typ":"14A","rok":3,"m2":55,"mods":"1117+1118","lay":"3R","bal":"balcony","note":""},{"id":"1109-1115","plan":11,"lgh":"1109","typ":"14A","rok":3,"m2":55,"mods":"1115+1116","lay":"3R","bal":"balcony","note":""},{"id":"1110-1113","plan":11,"lgh":"1110","typ":"14A","rok":3,"m2":55,"mods":"1113+1114","lay":"3R","bal":"balcony","note":""},{"id":"1108-1124","plan":11,"lgh":"1108","typ":"7A","rok":2,"m2":35,"mods":"1124+1125","lay":"2R","bal":"balcony","note":"Same LGH number as 1117+1118 on the drawing – identify by modules"},{"id":"1107-1101","plan":11,"lgh":"1107","typ":"6","rok":2,"m2":46,"mods":"1101+1102","lay":"2R","bal":"french","note":""},{"id":"1106-1103","plan":11,"lgh":"1106","typ":"5","rok":2,"m2":35,"mods":"1103+1104","lay":"2R","bal":"french","note":""},{"id":"1105-1105w","plan":11,"lgh":"1105","typ":"4","rok":2,"m2":35,"mods":"1105+1106 (west half)","lay":"2R","bal":"french","note":""},{"id":"1104-1105e","plan":11,"lgh":"1104","typ":"4","rok":2,"m2":35,"mods":"1105+1106 (east half)","lay":"2R","bal":"french","note":""},{"id":"1103-1107","plan":11,"lgh":"1103","typ":"4","rok":2,"m2":35,"mods":"1107+1108","lay":"2R","bal":"french","note":""},{"id":"1218-1223","plan":12,"lgh":"1218","typ":"12","rok":1,"m2":30,"mods":"1223","lay":"1R","bal":"none","note":""},{"id":"1201-1221","plan":12,"lgh":"1201","typ":"13","rok":2,"m2":34,"mods":"1221+1222","lay":"2R","bal":"none","note":""},{"id":"1202-1219","plan":12,"lgh":"1202","typ":"14B","rok":3,"m2":55,"mods":"1219+1220","lay":"3R","bal":"balcony","note":""},{"id":"1212-1217","plan":12,"lgh":"1212","typ":"14B","rok":3,"m2":55,"mods":"1217+1218","lay":"3R","bal":"balcony","note":""},{"id":"1213-1215","plan":12,"lgh":"1213","typ":"14B","rok":3,"m2":55,"mods":"1215+1216","lay":"3R","bal":"balcony","note":""},{"id":"1214-1213","plan":12,"lgh":"1214","typ":"14B","rok":3,"m2":55,"mods":"1213+1214","lay":"3R","bal":"balcony","note":""},{"id":"1209-1224","plan":12,"lgh":"1209","typ":"7B","rok":2,"m2":35,"mods":"1224+1225","lay":"2R","bal":"balcony","note":"Same LGH number as the east TYP 3 apartment – identify by modules"},{"id":"1208-1201","plan":12,"lgh":"1208","typ":"6","rok":2,"m2":46,"mods":"1201+1202","lay":"2R","bal":"french","note":""},{"id":"1207-1203","plan":12,"lgh":"1207","typ":"5","rok":2,"m2":35,"mods":"1203+1204","lay":"2R","bal":"french","note":""},{"id":"1206-1205w","plan":12,"lgh":"1206","typ":"4","rok":2,"m2":35,"mods":"1205+1206 (west half)","lay":"2R","bal":"french","note":""},{"id":"1205-1205e","plan":12,"lgh":"1205","typ":"4","rok":2,"m2":35,"mods":"1205+1206 (east half)","lay":"2R","bal":"french","note":""},{"id":"1204-1207w","plan":12,"lgh":"1204","typ":"4","rok":2,"m2":35,"mods":"1207+1208 (west half)","lay":"2R","bal":"french","note":""},{"id":"1203-1207e","plan":12,"lgh":"1203","typ":"4","rok":2,"m2":35,"mods":"1207+1208 (east half)","lay":"2R","bal":"french","note":""},{"id":"1211-1209w","plan":12,"lgh":"1211","typ":"4","rok":2,"m2":35,"mods":"1209+1210 (west half)","lay":"2R","bal":"french","note":""},{"id":"1210-1209e","plan":12,"lgh":"1210","typ":"4","rok":2,"m2":35,"mods":"1209+1210 (east half)","lay":"2R","bal":"french","note":""},{"id":"1209-1211w","plan":12,"lgh":"1209","typ":"3","rok":2,"m2":34,"mods":"1211+1212 (west half)","lay":"2R","bal":"french","note":"East half of 1211+1212 = återbruk / bike room"},{"id":"1318-1323","plan":13,"lgh":"1318","typ":"12","rok":1,"m2":30,"mods":"1323","lay":"1R","bal":"none","note":""},{"id":"1301-1321","plan":13,"lgh":"1301","typ":"13","rok":2,"m2":34,"mods":"1321+1322","lay":"2R","bal":"none","note":""},{"id":"1302-1319","plan":13,"lgh":"1302","typ":"14B","rok":3,"m2":55,"mods":"1319+1320","lay":"3R","bal":"balcony","note":""},{"id":"1313-1317","plan":13,"lgh":"1313","typ":"14B","rok":3,"m2":55,"mods":"1317+1318","lay":"3R","bal":"balcony","note":""},{"id":"1314-1315","plan":13,"lgh":"1314","typ":"14B","rok":3,"m2":55,"mods":"1315+1316","lay":"3R","bal":"balcony","note":""},{"id":"1315-1313","plan":13,"lgh":"1315","typ":"14B","rok":3,"m2":55,"mods":"1313+1314","lay":"3R","bal":"balcony","note":""},{"id":"1309-1324","plan":13,"lgh":"1309","typ":"7B","rok":2,"m2":35,"mods":"1324+1325","lay":"2R","bal":"balcony","note":"Same LGH number as the east TYP 3 apartment – identify by modules"},{"id":"1308-1301","plan":13,"lgh":"1308","typ":"6","rok":2,"m2":46,"mods":"1301+1302","lay":"2R","bal":"french","note":""},{"id":"1307-1303","plan":13,"lgh":"1307","typ":"5","rok":2,"m2":35,"mods":"1303+1304","lay":"2R","bal":"french","note":""},{"id":"1306-1305w","plan":13,"lgh":"1306","typ":"4","rok":2,"m2":35,"mods":"1305+1306 (west half)","lay":"2R","bal":"french","note":""},{"id":"1305-1305e","plan":13,"lgh":"1305","typ":"4","rok":2,"m2":35,"mods":"1305+1306 (east half)","lay":"2R","bal":"french","note":""},{"id":"1304-1307w","plan":13,"lgh":"1304","typ":"4","rok":2,"m2":35,"mods":"1307+1308 (west half)","lay":"2R","bal":"french","note":""},{"id":"1303-1307e","plan":13,"lgh":"1303","typ":"4","rok":2,"m2":35,"mods":"1307+1308 (east half)","lay":"2R","bal":"french","note":""},{"id":"1312-1309w","plan":13,"lgh":"1312","typ":"4","rok":2,"m2":35,"mods":"1309+1310 (west half)","lay":"2R","bal":"french","note":""},{"id":"1311-1309e","plan":13,"lgh":"1311","typ":"4","rok":2,"m2":35,"mods":"1309+1310 (east half)","lay":"2R","bal":"french","note":""},{"id":"1310-1311w","plan":13,"lgh":"1310","typ":"3","rok":2,"m2":34,"mods":"1311+1312 (west half)","lay":"2R","bal":"french","note":""},{"id":"1309-1311e","plan":13,"lgh":"1309","typ":"3","rok":2,"m2":34,"mods":"1311+1312 (east half)","lay":"2R","bal":"french","note":""},{"id":"1418-1423","plan":14,"lgh":"1418","typ":"12","rok":1,"m2":30,"mods":"1423","lay":"1R","bal":"none","note":"LGH by analogy with plan 13 – label missing on A-40.1-1410"},{"id":"1401-1421","plan":14,"lgh":"1401","typ":"13","rok":2,"m2":34,"mods":"1421+1422","lay":"2R","bal":"none","note":"LGH by analogy with plan 13 – label missing on A-40.1-1410"},{"id":"1402-1419","plan":14,"lgh":"1402","typ":"14B","rok":3,"m2":55,"mods":"1419+1420","lay":"3R","bal":"balcony","note":""},{"id":"1413-1417","plan":14,"lgh":"1413","typ":"14B","rok":3,"m2":55,"mods":"1417+1418","lay":"3R","bal":"balcony","note":""},{"id":"1414-1415","plan":14,"lgh":"1414","typ":"14B","rok":3,"m2":55,"mods":"1415+1416","lay":"3R","bal":"balcony","note":""},{"id":"1415-1413","plan":14,"lgh":"1415","typ":"14B","rok":3,"m2":55,"mods":"1413+1414","lay":"3R","bal":"balcony","note":""},{"id":"1409-1424","plan":14,"lgh":"1409","typ":"7B","rok":2,"m2":35,"mods":"1424+1425","lay":"2R","bal":"balcony","note":"LGH by analogy with plan 13 – label missing on A-40.1-1410; Same LGH number as the east TYP 3 apartment – identify by modules"},{"id":"1408-1401","plan":14,"lgh":"1408","typ":"6","rok":2,"m2":46,"mods":"1401+1402","lay":"2R","bal":"french","note":""},{"id":"1407-1403","plan":14,"lgh":"1407","typ":"5","rok":2,"m2":35,"mods":"1403+1404","lay":"2R","bal":"french","note":""},{"id":"1406-1405w","plan":14,"lgh":"1406","typ":"4","rok":2,"m2":35,"mods":"1405+1406 (west half)","lay":"2R","bal":"french","note":""},{"id":"1405-1405e","plan":14,"lgh":"1405","typ":"4","rok":2,"m2":35,"mods":"1405+1406 (east half)","lay":"2R","bal":"french","note":""},{"id":"1404-1407w","plan":14,"lgh":"1404","typ":"4","rok":2,"m2":35,"mods":"1407+1408 (west half)","lay":"2R","bal":"french","note":""},{"id":"1403-1407e","plan":14,"lgh":"1403","typ":"4","rok":2,"m2":35,"mods":"1407+1408 (east half)","lay":"2R","bal":"french","note":""},{"id":"1412-1409w","plan":14,"lgh":"1412","typ":"4","rok":2,"m2":35,"mods":"1409+1410 (west half)","lay":"2R","bal":"french","note":""},{"id":"1411-1409e","plan":14,"lgh":"1411","typ":"4","rok":2,"m2":35,"mods":"1409+1410 (east half)","lay":"2R","bal":"french","note":""},{"id":"1410-1411w","plan":14,"lgh":"1410","typ":"3","rok":2,"m2":34,"mods":"1411+1412 (west half)","lay":"2R","bal":"french","note":""},{"id":"1409-1411e","plan":14,"lgh":"1409","typ":"3","rok":2,"m2":34,"mods":"1411+1412 (east half)","lay":"2R","bal":"french","note":""},{"id":"1509-1524","plan":15,"lgh":"1509","typ":"34","rok":2,"m2":45,"mods":"1524+1525","lay":"2R","bal":"balcony","note":"Same LGH number as the east TYP 3 apartment – identify by modules"},{"id":"1501-1521","plan":15,"lgh":"1501","typ":"32","rok":3,"m2":49,"mods":"1521+1522+1523","lay":"3R","bal":"balcony","note":""},{"id":"1502-1519","plan":15,"lgh":"1502","typ":"14B","rok":3,"m2":55,"mods":"1519+1520","lay":"3R","bal":"balcony","note":""},{"id":"1513-1517","plan":15,"lgh":"1513","typ":"14B","rok":3,"m2":55,"mods":"1517+1518","lay":"3R","bal":"balcony","note":""},{"id":"1514-1515","plan":15,"lgh":"1514","typ":"14B","rok":3,"m2":55,"mods":"1515+1516","lay":"3R","bal":"balcony","note":""},{"id":"1515-1513","plan":15,"lgh":"1515","typ":"14B","rok":3,"m2":55,"mods":"1513+1514","lay":"3R","bal":"balcony","note":""},{"id":"1508-1501","plan":15,"lgh":"1508","typ":"6","rok":2,"m2":46,"mods":"1501+1502","lay":"2R","bal":"french","note":""},{"id":"1507-1503","plan":15,"lgh":"1507","typ":"5","rok":2,"m2":35,"mods":"1503+1504","lay":"2R","bal":"french","note":""},{"id":"1506-1505w","plan":15,"lgh":"1506","typ":"4","rok":2,"m2":35,"mods":"1505+1506 (west half)","lay":"2R","bal":"french","note":""},{"id":"1505-1505e","plan":15,"lgh":"1505","typ":"4","rok":2,"m2":35,"mods":"1505+1506 (east half)","lay":"2R","bal":"french","note":""},{"id":"1504-1507w","plan":15,"lgh":"1504","typ":"4","rok":2,"m2":35,"mods":"1507+1508 (west half)","lay":"2R","bal":"french","note":""},{"id":"1503-1507e","plan":15,"lgh":"1503","typ":"4","rok":2,"m2":35,"mods":"1507+1508 (east half)","lay":"2R","bal":"french","note":""},{"id":"1512-1509w","plan":15,"lgh":"1512","typ":"4","rok":2,"m2":35,"mods":"1509+1510 (west half)","lay":"2R","bal":"french","note":""},{"id":"1511-1509e","plan":15,"lgh":"1511","typ":"4","rok":2,"m2":35,"mods":"1509+1510 (east half)","lay":"2R","bal":"french","note":""},{"id":"1510-1511w","plan":15,"lgh":"1510","typ":"3","rok":2,"m2":34,"mods":"1511+1512 (west half)","lay":"2R","bal":"french","note":""},{"id":"1509-1511e","plan":15,"lgh":"1509","typ":"3","rok":2,"m2":34,"mods":"1511+1512 (east half)","lay":"2R","bal":"french","note":""},{"id":"1609-1624","plan":16,"lgh":"1609","typ":"34","rok":2,"m2":45,"mods":"1624+1625","lay":"2R","bal":"balcony","note":"Same LGH number as the east TYP 3 apartment – identify by modules"},{"id":"1601-1621","plan":16,"lgh":"1601","typ":"32","rok":3,"m2":49,"mods":"1621+1622+1623","lay":"3R","bal":"balcony","note":""},{"id":"1602-1619","plan":16,"lgh":"1602","typ":"14B","rok":3,"m2":55,"mods":"1619+1620","lay":"3R","bal":"balcony","note":""},{"id":"1613-1617","plan":16,"lgh":"1613","typ":"14B","rok":3,"m2":55,"mods":"1617+1618","lay":"3R","bal":"balcony","note":""},{"id":"1614-1615","plan":16,"lgh":"1614","typ":"14B","rok":3,"m2":55,"mods":"1615+1616","lay":"3R","bal":"balcony","note":""},{"id":"1615-1613","plan":16,"lgh":"1615","typ":"14B","rok":3,"m2":55,"mods":"1613+1614","lay":"3R","bal":"balcony","note":""},{"id":"1608-1601","plan":16,"lgh":"1608","typ":"6","rok":2,"m2":46,"mods":"1601+1602","lay":"2R","bal":"french","note":""},{"id":"1607-1603","plan":16,"lgh":"1607","typ":"5","rok":2,"m2":35,"mods":"1603+1604","lay":"2R","bal":"french","note":""},{"id":"1606-1605w","plan":16,"lgh":"1606","typ":"4","rok":2,"m2":35,"mods":"1605+1606 (west half)","lay":"2R","bal":"french","note":""},{"id":"1605-1605e","plan":16,"lgh":"1605","typ":"4","rok":2,"m2":35,"mods":"1605+1606 (east half)","lay":"2R","bal":"french","note":""},{"id":"1604-1607w","plan":16,"lgh":"1604","typ":"4","rok":2,"m2":35,"mods":"1607+1608 (west half)","lay":"2R","bal":"french","note":""},{"id":"1603-1607e","plan":16,"lgh":"1603","typ":"4","rok":2,"m2":35,"mods":"1607+1608 (east half)","lay":"2R","bal":"french","note":""},{"id":"1612-1609w","plan":16,"lgh":"1612","typ":"4","rok":2,"m2":35,"mods":"1609+1610 (west half)","lay":"2R","bal":"french","note":""},{"id":"1611-1609e","plan":16,"lgh":"1611","typ":"4","rok":2,"m2":35,"mods":"1609+1610 (east half)","lay":"2R","bal":"french","note":""},{"id":"1610-1611w","plan":16,"lgh":"1610","typ":"3","rok":2,"m2":34,"mods":"1611+1612 (west half)","lay":"2R","bal":"french","note":""},{"id":"1609-1611e","plan":16,"lgh":"1609","typ":"3","rok":2,"m2":34,"mods":"1611+1612 (east half)","lay":"2R","bal":"french","note":""},{"id":"1706-1724","plan":17,"lgh":"1706","typ":"37","rok":1,"m2":30,"mods":"1724+1725","lay":"1R","bal":"none","note":""},{"id":"1701-1721","plan":17,"lgh":"1701","typ":"32","rok":3,"m2":49,"mods":"1721+1722+1723","lay":"3R","bal":"balcony","note":""},{"id":"1702-1719","plan":17,"lgh":"1702","typ":"14B","rok":3,"m2":55,"mods":"1719+1720","lay":"3R","bal":"balcony","note":""},{"id":"1711-1717","plan":17,"lgh":"1711","typ":"14B","rok":3,"m2":55,"mods":"1717+1718","lay":"3R","bal":"balcony","note":""},{"id":"1712-1715","plan":17,"lgh":"1712","typ":"14B","rok":3,"m2":55,"mods":"1715+1716","lay":"3R","bal":"balcony","note":""},{"id":"1713-1713","plan":17,"lgh":"1713","typ":"14B","rok":3,"m2":55,"mods":"1713+1714","lay":"3R","bal":"balcony","note":""},{"id":"1705-1702","plan":17,"lgh":"1705","typ":"36","rok":2,"m2":29,"mods":"1702+1703","lay":"2R","bal":"none","note":""},{"id":"1704-1705","plan":17,"lgh":"1704","typ":"33","rok":2,"m2":35,"mods":"1705","lay":"2R","bal":"none","note":""},{"id":"1703-1707","plan":17,"lgh":"1703","typ":"33","rok":2,"m2":35,"mods":"1707","lay":"2R","bal":"none","note":""},{"id":"1710-1709","plan":17,"lgh":"1710","typ":"33","rok":2,"m2":35,"mods":"1709","lay":"2R","bal":"none","note":""},{"id":"1709-1711","plan":17,"lgh":"1709","typ":"33","rok":2,"m2":35,"mods":"1711","lay":"2R","bal":"none","note":""}];
+const P=s=>s.split(" · ");
+const DOOR=P("closing · leaf · frame · frame cover · frame cover 45° joint"),BDOOR=P("closing · leaf · frame · outside frame · outside frame 45° joint"),
+ SKIRT=P("gap wall / skirting · gap floor / skirting · alignment · nails / filler · paint spots"),
+ FLOOR=P("movement / squeak · scratch · spacing · water damage · floor cut too short"),
+ WALLS=P("W1 · W1-W2 · W2 · W2-W3 · W3 · W3-W4 · W4 · W4-W1"),
+ CEIL=P("ceiling · around ventilation opening · ceiling accessories complete"),
+ RAD=P("installed · thermostat · grill / bracket"),
+ WIN=P("opening / closing · handle · glass · frame & gasket · window list (trim) · window sill · protection tape removed"),
+ BAL=P("opening / closing · handle · glass · frame & gasket · threshold");
+const ROOMS3=[
+ {k:"hall",name:"Entrance / Hall",items:[["Entrance door",P("closing · leaf · frame · frame cover · frame cover 45° joint · gasket · wooden threshold list · silicone")],["Wood floor",P("connection at entrance door · movement / squeak")],["Skirting",SKIRT],["Clothes hanger",["fixed"]],["Walls",WALLS],["Distribution board (DB box)",P("flush with wall · cover / door")],["Bathroom door (hall side)",DOOR],["FRD door",DOOR]]},
+ {k:"frd",name:"FRD (storage)",items:[["Skirting",SKIRT],["Floor",FLOOR],["Walls (painting)",WALLS],["Ceiling",CEIL],["Storage rack",P("fixed · complete · undamaged")],["Pipe shaft",["closed"]],["Fire seal around conduits",["fire seal"]]]},
+ {k:"bath",name:"Bathroom",items:[["Floor tiles",P("tiles · grout")],["Wall tiles",WALLS],["Ceiling & LK box",P("ceiling · LK box · around LK box / ventilation opening")],["Sink",["fixing"]],["Tap",P("installed · moving / tightened")],["Mirror",["mirror"]],["Shower",P("head support · head installed · tap fixing · tap dirty")],["Shower glass",["shower glass"]],["Towel dryer",P("fixed · level · clean")],["Toilet",["seat & basin"]],["Bathroom door",BDOOR],["Threshold",P("side gaps · silicone · crack · movement / squeak")],["Ventilation unit",P("connection · connection box")],["Cabinet",["cabinet"]]]},
+ {k:"kitchen",name:"Kitchen",items:[["Skirting",SKIRT],["Floor",FLOOR],["Control panel in the cabinet",["control panel"]],["Kitchen top",P("scratches · cracks · silicone")],["Backsplash",P("connection · scratches · cracks · silicone · silicone wall to furniture (L/R)")],["Furniture",P("adjustment / level · gaps · screw covers · doors & drawers · clean")],["Tap & sink",P("tap installed · tap moving / tightened · sink fixing · silicone at sink")],["Dishwasher hole",["dishwasher hole"]],["Walls",WALLS],["Ceiling",CEIL]]},
+ {k:"living",name:"Living room",items:[["Window",WIN],["Balcony door",BAL],["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD]]},
+ {k:"bed1",name:"Bedroom 1",items:[["Bedroom 1 door",DOOR],["Window",WIN],["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD],["Furniture",["furniture"]]]},
+ {k:"bed2",name:"Bedroom 2",items:[["Bedroom 2 door",DOOR],["Window",WIN],["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD],["Furniture",["furniture"]]]}];
+const FRENCH=P("opening / closing · handle · glass · frame & gasket · railing");
+const RCACHE={};
+function roomsOf(id){const ap=APTS.find(x=>x.id===id);if(!ap)return ROOMS3;const key=ap.lay+"|"+ap.bal;if(RCACHE[key])return RCACHE[key];
+ const cp=r=>({k:r.k,name:r.name,items:r.items.map(it=>[it[0],it[1]])});let rs=ROOMS3.map(cp);
+ const liv=rs.find(r=>r.k==="living");const bi=liv.items.findIndex(it=>it[0]==="Balcony door");
+ if(ap.bal==="french")liv.items[bi]=["French balcony door",FRENCH];else if(ap.bal==="none")liv.items.splice(bi,1);
+ if(ap.lay!=="3R")rs=rs.filter(r=>r.k!=="bed2");
+ if(ap.lay==="2R"){const b=rs.find(r=>r.k==="bed1");b.name="Bedroom";b.items[0][0]="Bedroom door"}
+ if(ap.lay==="1R")rs=rs.filter(r=>r.k!=="bed1");
+ RCACHE[key]=rs;return rs}
+let ROOMS=ROOMS3;function useApt(id){ROOMS=roomsOf(id);return ROOMS}
+const RNAME={hall:"Entrance / Hall",frd:"FRD (storage)",bath:"Bathroom",kitchen:"Kitchen",living:"Living room",bed1:"Bedroom 1",bed2:"Bedroom 2"};
+const ALLR=["hall","frd","bath","kitchen","living","bed1","bed2"];
+const WRULE=`<svg viewBox="0 0 120 92" class="wsvg" role="img" aria-label="Wall numbering"><rect x="22" y="10" width="76" height="62" class="wr"/><rect x="50" y="68" width="20" height="8" class="wd"/><text x="12" y="45">W1</text><text x="60" y="7">W2</text><text x="108" y="45">W3</text><text x="60" y="88">W4 · door</text></svg>`;
+const PEOPLE={TLC:["Dan Ardeleanu","Joey Zong","Jinxiang Zhou"],NT:["Robin Rask","Nicklas Palm"]};
+const POLY={living:"330,300 685,300 685,724 330,724",kitchen:"330,724 685,724 685,850 925,850 925,1065 330,1065",bed2:"685,300 925,300 925,705 685,705",
+ bed1:"930,300 1272,300 1272,775 1075,775 1075,705 930,705",frd:"685,740 920,740 920,850 685,850",hall:"925,705 1075,705 1075,790 1068,790 1068,1065 925,1065",bath:"1068,790 1272,790 1272,1065 1068,1065"};
+const LAB={living:[505,520,"Living"],kitchen:[520,960,"Kitchen"],bed2:[805,470,"Bed 2"],bed1:[1100,470,"Bed 1"],frd:[800,808,"FRD"],hall:[996,880,"Hall"],bath:[1170,940,"Bath"]};
+const WB={living:[[450,1035],[360,700],[505,338],[650,600]],kitchen:[[450,1035],[360,700],[505,338],[650,600]],bed2:[[805,338],[895,560],[805,672],[715,400]],
+ bed1:[[960,420],[1100,338],[1242,500],[1170,680]],frd:[[712,800],[752,765],[893,795],[820,828]],hall:[[950,905],[1045,730],[1045,1000],[970,1035]],bath:[[1170,822],[1242,930],[1170,1035],[1098,930]]};
+
+/* ===== what can be wrong with each point (draft – to agree) ===== */
+const WALLISS=["Crack in corner","Crack at ceiling joint","Crack above door","Crack around / under window","Diagonal crack","Straight crack","Large crack","Gap above window","Missing gypsum","Visible screws","Water damage","Paint spots","Patchy paint","Dent / damage","Dirty"];
+const CEILISS=["Crack","Crack at wall joint","Crack around opening","Visible screws","Water damage","Patchy paint","Paint spots","Dirty"];
+const DOORISS=["Scratch","Dent / damage","Paint damage","Repair visible","Gap","Loose","Dirty"];
+const ISS=[
+ [/^w\d-w\d$/,["Crack in corner"].concat(WALLISS.filter(x=>x!=="Crack in corner"))],
+ [/^w\d$/,WALLISS],
+ [/^ceiling$|around .*opening/,CEILISS],
+ [/45°/,["Gap","Crack","Not aligned","Paint"]],
+ [/opening|closing/,["Not closing","Hard to open","Rubbing","Needs adjustment"]],
+ [/protection tape/,["Tape not removed"]],
+ [/window list/,["Gap between window and list","Damaged","Paint"]],
+ [/^glass|shower glass/,["Scratch","Crack","Missing glass","Dirty"]],
+ [/mirror/,["Scratch","Crack","Dirty","Missing"]],
+ [/dirty|^clean$/,["Dirty"]],
+ [/silicone at sink/,["Too much silicone","Yellow / wrong colour","Missing","Damaged","Dirty"]],
+ [/gasket|silicone/,["Missing","Damaged","Dirty","Gap","Wrong colour"]],
+ [/flush with wall/,["Not flush with wall","Gap to wall","Loose"]],
+ [/grout/,["Grout colour uneven","Missing grout","Crack in grout"]],
+ [/^tiles$|floor tiles/,["Cracked tile","Chipped","Uneven","Dirty"]],
+ [/alignment/,["Not aligned","Gap"]],
+ [/nails/,["Nails visible","Nails covered with silicone","Filler visible"]],
+ [/adjustment/,["Not level","Not even with ceiling","Needs adjustment"]],
+ [/^gaps$/,["Gap","Grill gap"]],
+ [/screw covers/,["Different colour","Missing"]],
+ [/doors & drawers/,["Not closing","Needs adjustment","Damaged","Scratch"]],
+ [/thermostat/,["Missing","Loose","Not moving"]],
+ [/grill/,["Bracket not fixing the grill","Loose","Damaged"]],
+ [/cut too short/,["Too short","Gap"]],
+ [/gap|spacing/,["Gap too big","Not sealed","Uneven"]],
+ [/paint/,["Paint spots","Missing paint"]],
+ [/scratch/,["Light scratch","Deep scratch"]],
+ [/crack/,["Hairline crack","Large crack"]],
+ [/water/,["Water stain","Swelling"]],
+ [/movement|squeak/,["Squeaks","Moves","Uneven"]],
+ [/connection at entrance/,["Gap","Not aligned","Damaged"]],
+ [/accessories|complete/,["Missing part","Damaged"]],
+ [/handle|fixed|fixing|installed|moving|tightened|level|support|connection|seat|closed|fire seal|lk box|control panel|cover \/ door/,["Loose","Missing","Damaged","Not working"]],
+ [/frame|leaf|cover/,DOORISS],
+ [/threshold|list|sill|floor|furniture|cabinet|hole|undamaged/,["Scratch","Dent / damage","Gap","Crack","Paint","Loose"]]];
+const TILEISS=["Cracked tile","Crack in corner","Gap / silicone in corner","Grout colour uneven","Chipped tile","Uneven tiles","Dirty"];
+const issuesFor=(pt,item)=>{if(/wall tiles/i.test(item||"")&&/^W\d/.test(pt))return TILEISS.concat(["Other"]);const p=pt.toLowerCase();const m=ISS.find(r=>r[0].test(p));return (m?m[1]:["Damaged","Scratch","Missing","Loose","Dirty","Not working"]).concat(["Other"])};
+function catOf(i){const s=i.toLowerCase();
+ if(/screw cover/.test(s))return "Finish";if(/screw/.test(s))return "Visible screws";if(/grout|tile/.test(s))return "Tiles";if(/tape|different colour|wrong colour|yellow|too much silicone|filler|nails/.test(s))return "Finish";if(/flush|grill gap|not level|not even/.test(s))return "Gap / fit";if(/gypsum/.test(s))return "Damaged";if(/crack/.test(s))return "Crack";if(/paint/.test(s))return "Paint";if(/scratch/.test(s))return "Scratch";if(/gap|not sealed|too short|uneven/.test(s))return "Gap / fit";
+ if(/dent|damaged/.test(s))return "Damaged";if(/missing/.test(s))return "Missing";if(/loose|moves/.test(s))return "Loose";
+ if(/closing|hard to open|rubbing|adjust|not working|not aligned/.test(s))return "Function";if(/dirty/.test(s))return "Dirty";if(/water|swelling/.test(s))return "Water";if(/squeak/.test(s))return "Loose";return "Other"}
+const SEV=["Cosmetic","Repair","Replace"];
+function defaultSev(issue){const c=catOf(issue);if(c==="Paint"||c==="Dirty"||c==="Finish"||/hairline|light scratch|grout colour/i.test(issue))return "Cosmetic";if(c==="Missing")return "Replace";return "Repair"}
+function trade(item,point,issue){const e=(item+" "+point).toLowerCase();
+ if(/silicone|gasket/.test(point.toLowerCase())&&catOf(issue)!=="Paint")return "Silicone / sealant";
+ if(/tile/.test(e))return "Tiler";
+ if(/tap|sink|shower(?! glass)|toilet|radiator|towel dryer|dishwasher/.test(e))return "Plumber";
+ if(/distribution|db box|lk box|control panel/.test(e)&&!/crack|paint/i.test(issue))return "Electrician";
+ if(/ventilation/.test(e))return "Ventilation";
+ if(/fire seal|pipe shaft/.test(e))return "Fire sealing";
+ if(/mirror|glass/.test(e))return "Fitter";
+ if(/^walls|^ceiling /.test(e+" ")&&!/accessories/.test(e))return "Painter";
+ if(/floor|skirting|threshold/.test(e))return "Floor / carpenter";
+ return "Carpenter / fitter"}
+const wallOf=pt=>/^W\d(-W\d)?$/.test(pt)?pt:"";
+const firstPhoto=d=>(d.photos&&d.photos[0])||d.photo||null;
+
+/* ===== storage: on this phone (IndexedDB "herakles-v2"; the first app version keeps its own data) ===== */
+const mem={state:null,photos:{}};let idb=null;
+function openDB(){return new Promise(res=>{try{const r=indexedDB.open("herakles-v2",1);r.onupgradeneeded=()=>{const d=r.result;["kv","photos"].forEach(s=>{if(!d.objectStoreNames.contains(s))d.createObjectStore(s)})};
+ r.onsuccess=()=>{idb=r.result;res(true)};r.onerror=()=>res(false);r.onblocked=()=>res(false)}catch(e){res(false)}})}
+function put(store,key,val){if(store==="photos")mem.photos[key]=val;if(!idb)return Promise.resolve(true);return new Promise(res=>{try{const t=idb.transaction(store,"readwrite");t.objectStore(store).put(val,key);t.oncomplete=()=>res(true);t.onerror=()=>res(false);t.onabort=()=>res(false)}catch(e){res(false)}})}
+function del(store,key){if(store==="photos"){delete mem.photos[key];if(urlCache[key]){URL.revokeObjectURL(urlCache[key]);delete urlCache[key]}}if(!idb)return Promise.resolve();return new Promise(res=>{try{const t=idb.transaction(store,"readwrite");t.objectStore(store).delete(key);t.oncomplete=()=>res();t.onerror=()=>res()}catch(e){res()}})}
+function getAll(store){if(!idb)return Promise.resolve({});return new Promise(res=>{const out={};try{const t=idb.transaction(store,"readonly");const rq=t.objectStore(store).openCursor();rq.onsuccess=()=>{const c=rq.result;if(c){out[c.key]=c.value;c.continue()}else res(out)};rq.onerror=()=>res(out)}catch(e){res(out)}})}
+const S=()=>mem.state;
+const saveState=()=>put("kv","state",JSON.parse(JSON.stringify(mem.state)));
+const urlCache={};function photoURL(id){if(!id)return "";if(urlCache[id])return urlCache[id];const b=mem.photos[id];if(!b)return "";urlCache[id]=URL.createObjectURL(b);return urlCache[id]}
+
+/* ===== helpers ===== */
+const $app=document.getElementById("app");
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(t){document.querySelectorAll(".toast").forEach(x=>x.remove());const d=document.createElement("div");d.className="toast";d.setAttribute("role","status");d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)}
+const aptById=id=>APTS.find(a=>a.id===id);const roomByK=k=>ROOMS.find(r=>r.k===k)||ROOMS3.find(r=>r.k===k);
+const newId=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function A(id){useApt(id);const st=S();if(!st.apts[id])st.apts[id]={startedAt:null,endedAt:null,ok:{},na:{},r2ok:{},defects:[]};const a=st.apts[id];if(!a.na)a.na={};if(!a.r2ok)a.r2ok={};return a}
+const fmt=ms=>{const s=Math.max(0,Math.round(ms/1000));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
+const elapsed=a=>a.startedAt?((a.endedAt||Date.now())-a.startedAt):0;
+const TARGET=10*60*1000; /* one apartment = two modules */
+const itemDefs=(a,k,i)=>a.defects.filter(d=>d.room===k&&d.i===i);
+const itemState=(a,k,i)=>itemDefs(a,k,i).length?"nok":(a.ok[k+":"+i]||(a.r2ok&&a.r2ok[k+":"+i]))?"ok":(a.na&&(k+":"+i) in a.na)?"na":"todo";
+const NA_WHY=["Packed / protected","Not installed","No access"];
+const naOpen=a=>Object.keys(a.na||{}).filter(key=>{const [k,i]=key.split(":");return itemState(a,k,+i)==="na"});
+const clock=t=>t?new Date(t).toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"}):"–";
+function roomStat(a,k){const R=roomByK(k);let ok=0,nok=0,na=0;R.items.forEach((_,i)=>{const s=itemState(a,k,i);if(s==="ok")ok++;if(s==="nok")nok++;if(s==="na")na++});
+ const defs=a.defects.filter(d=>d.room===k).length;return {n:R.items.length,ok,nok,na,done:ok+nok+na,complete:ok+nok+na===R.items.length,defs}}
+const aptComplete=a=>ROOMS.every(R=>roomStat(a,R.k).complete);
+let wake=null;async function reqWake(){if(wake||!navigator.wakeLock)return;try{wake=await navigator.wakeLock.request("screen");wake.addEventListener("release",()=>{wake=null})}catch(e){}}
+function touch(a){reqWake();if(a.signedAt)return;if(!a.startedAt)a.startedAt=Date.now();a.endedAt=aptComplete(a)?(a.endedAt||Date.now()):null}
+
+/* ===== header / dock ===== */
+let curApt=null,curRoom=null,openItem=null;
+function header(title,back,right){document.getElementById("hTitle").textContent=title;const b=document.getElementById("backBtn");b.hidden=!back;b.onclick=()=>{location.hash=back==="home"?"":back};
+ const r=document.getElementById("hRight");r.hidden=!right;if(right){r.textContent=right[0];r.onclick=right[1]}}
+function dock(html){const d=document.getElementById("dock");if(!html){d.hidden=true;return}d.hidden=false;document.getElementById("dockIn").innerHTML=html}
+const timerEl=document.getElementById("timer");
+setInterval(()=>{if(!curApt){timerEl.hidden=true;return}const a=A(curApt);timerEl.hidden=!a.startedAt;const ms=elapsed(a);timerEl.textContent=fmt(ms);timerEl.classList.toggle("late",ms>TARGET)},1000);
+
+/* ===== plan ===== */
+function planSVG(a,sel){let s=`<svg viewBox="300 250 1010 880" role="img" aria-label="${sel?"Wall numbers for this room":"Apartment plan. Tap a room."}">`;
+ s+=`<text x="801" y="282" text-anchor="middle" class="l2">FAÇADE (windows)</text><text x="801" y="1112" text-anchor="middle" class="l2">CORRIDOR · ENTRANCE ↑</text>`;
+ for(const k in POLY){const pair=(sel==="living"&&k==="kitchen")||(sel==="kitchen"&&k==="living");const st=roomStat(a,k);const c=sel?(k===sel?"sel":pair?"":"dim"):(st.complete?"done":"");
+  s+=sel?`<polygon class="rm ${c}" points="${POLY[k]}"></polygon>`:`<polygon class="rm ${c}" points="${POLY[k]}" data-room="${k}" tabindex="0" role="button" aria-label="${esc(roomByK(k).name)}"></polygon>`}
+ [[390,510],[515,620],[740,865],[985,1215]].forEach(([x1,x2])=>{s+=`<rect class="win" x="${x1}" y="292" width="${x2-x1}" height="16"></rect>`});
+ if(!sel)for(const k in LAB){const st=roomStat(a,k);s+=`<text x="${LAB[k][0]}" y="${LAB[k][1]}" text-anchor="middle">${LAB[k][2]}${st.complete?" ✓":""}</text>`;
+  if(st.defs)s+=`<g class="cnt"><circle cx="${LAB[k][0]}" cy="${LAB[k][1]+42}" r="24"></circle><text x="${LAB[k][0]}" y="${LAB[k][1]+51}" text-anchor="middle">${st.defs}</text></g>`}
+ if(sel&&WB[sel])WB[sel].forEach(([x,y],i)=>{const w="W"+(i+1);const n=a.defects.filter(d=>d.room===sel&&d.wall===w).length;
+  s+=`<g class="wb${n?" hit":""}"><circle cx="${x}" cy="${y}" r="40"></circle><text x="${x}" y="${y+8}" text-anchor="middle">${w}${n?"·"+n:""}</text></g>`});
+ return s+"</svg>"}
+
+
+/* ===== apartment sketches (from architect plans A-40.1, simplified) – rect = [x,y,w,h], d = side of the room's door (N/E/S/W, north up) ===== */
+/* Sketch geometry in dm, read from TLC Prototype drawings (Dalux Prototype/TYP xx, CAGA) and checked against M-40-P building layouts. Corridor/entrance always at the top. */
+const SK={"4":{"W":51.6,"H":73.9,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"hall":{"r":[[25.4,0.0,26.2,17.9]],"d":"N","dr":[34.0,0.0,42.9,0.0]},"kitchen":{"r":[[0.0,0.0,25.4,38.4]],"d":"E","dr":[25.4,0.0,25.4,17.9],"open":1},"bath":{"r":[[25.4,17.9,26.2,20.4]],"d":"N","dr":[34.7,17.9,42.9,17.9]},"living":{"r":[[0.0,38.4,28.6,35.6]],"d":"N","dr":[6.7,38.4,22.4,38.4],"open":1},"bed1":{"r":[[28.6,46.1,23.0,27.9]],"d":"W","dr":[28.6,46.5,28.6,54.6]},"frd":{"r":[[28.6,38.4,23.0,7.7]],"d":"S","dr":[29.4,46.1,50.4,46.1]}},"ent":[34.0,0.0,42.9,0.0]},"5":{"W":71.6,"H":73.9,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"hall":{"r":[[54.2,0.0,17.5,38.1]],"d":"N","dr":[54.8,0.0,64.7,0.0]},"bath":{"r":[[35.3,1.2,18.8,24.8]],"d":"E","dr":[54.2,8.3,54.2,16.9]},"frd":{"r":[[40.9,26.2,10.7,11.5]],"d":"E","dr":[51.6,27.6,51.6,35.5]},"kitchen":{"r":[[63.1,38.1,8.5,35.7]],"d":"N","dr":[63.1,38.1,71.6,38.1],"open":1},"living":{"r":[[22.9,38.1,40.3,35.7]],"d":"N","dr":[52.4,38.1,63.1,38.1],"open":1},"bed1":{"r":[[0.0,38.1,22.9,35.7]],"d":"E","dr":[22.9,40.9,22.9,48.8]}},"ent":[54.8,0.0,64.7,0.0],"block":[[35.3,26.2,5.6,11.5,""]],"out":[[0.0,0.0,34.8,38.1]],"opn":[[63.1,39.1,63.1,73.9]]},"6":{"W":89.3,"H":69.9,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"hall":{"r":[[0.0,0.0,52.8,14.5],[5.5,14.5,20.5,20.0]],"d":"N","dr":[12.7,0.0,4.0,0.0]},"bath":{"r":[[26.0,14.5,26.8,20.0]],"d":"N","dr":[44.0,14.5,36.0,14.5]},"frd":{"r":[[0.0,12.5,5.5,22.0]],"d":"E","dr":[5.5,30.5,5.5,13.0]},"living":{"r":[[8.0,34.5,52.5,35.3]],"d":"N","dr":[26.0,34.5,8.0,34.5],"open":1},"kitchen":{"r":[[0.0,34.5,8.0,35.3]],"d":"E","dr":[8.0,69.5,8.0,35.0],"open":1},"bed1":{"r":[[60.5,34.5,28.8,35.3]],"d":"W","dr":[60.5,67.9,60.5,59.5]}},"ent":[12.7,0.0,4.0,0.0],"out":[[52.8,0.0,36.5,34.5]]},"7":{"W":69.5,"H":54.6,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"bed1":{"r":[[0.0,6.7,29.1,47.9],[21.4,0.0,7.8,6.7]],"d":"E","dr":[29.1,53.8,29.1,44.6]},"frd":{"r":[[0.0,0.0,21.4,6.7]],"d":"S","dr":[1.0,6.7,21.4,6.7]},"bath":{"r":[[29.1,0.0,20.2,26.4]],"d":"E","dr":[49.4,17.0,49.4,8.9]},"hall":{"r":[[49.4,0.0,20.1,16.0]],"d":"N","dr":[52.2,0.0,60.9,0.0]},"living":{"r":[[29.1,29.3,31.8,25.3],[49.4,16.0,11.5,13.3]],"d":"N","dr":[49.4,16.0,60.9,16.0],"open":1},"kitchen":{"r":[[60.9,16.0,8.6,38.5]],"d":"W","dr":[60.9,52.6,60.9,16.0],"open":1}},"ent":[52.2,0.0,60.9,0.0],"block":[[35.1,26.4,14.3,2.9,""]]},"13":{"W":52.4,"H":68.3,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"living":{"r":[[22.2,30.6,30.2,37.7]],"d":"N","dr":[52.4,30.6,33.4,30.6],"open":1},"bed1":{"r":[[0.0,34.4,22.2,33.9]],"d":"E","dr":[22.2,43.9,22.2,35.7]},"frd":{"r":[[0.0,25.8,18.3,8.6]],"d":"S","dr":[11.5,34.4,0.4,34.4]},"bath":{"r":[[0.0,0.0,19.1,25.8]],"d":"E","dr":[19.1,16.3,19.1,8.3]},"hall":{"r":[[19.1,0.0,14.3,30.6],[18.3,30.6,4.0,3.8]],"d":"N","dr":[29.4,0.0,20.6,0.0]},"kitchen":{"r":[[33.4,0.0,19.1,30.6]],"d":"W","dr":[33.4,29.4,33.4,0.0],"open":1}},"ent":[29.4,0.0,20.6,0.0]},"14":{"W":85.0,"H":69.1,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"living":{"r":[[52.8,9.1,32.2,60.0],[42.1,9.1,10.7,11.1]],"d":"W","dr":[42.1,20.2,42.1,9.1],"open":1},"kitchen":{"r":[[42.1,0.0,42.9,9.1]],"d":"W","dr":[42.1,9.1,42.1,0.0],"open":1},"bed2":{"r":[[31.8,31.4,21.0,37.7]],"d":"E","dr":[52.8,47.5,52.8,39.7]},"bed1":{"r":[[0.0,31.4,31.8,37.7],[0.0,26.2,19.5,5.2]],"d":"N","dr":[31.0,31.4,21.8,31.4]},"frd":{"r":[[31.8,20.2,21.0,11.1]],"d":"N","dr":[52.4,20.2,33.0,20.2]},"bath":{"r":[[0.0,0.0,19.5,26.2]],"d":"E","dr":[19.5,16.7,19.5,8.7]},"hall":{"r":[[19.5,0.0,22.6,20.2],[19.5,20.2,12.3,11.1]],"d":"N","dr":[29.8,0.0,21.0,0.0]}},"ent":[29.8,0.0,21.0,0.0],"opn":[[85.0,9.1,42.1,9.1]]},"32":{"W":95.3,"H":69.1,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"bed2":{"r":[[66.7,32.2,28.6,36.9]],"d":"W","dr":[66.7,47.5,66.7,39.7]},"living":{"r":[[22.6,31.0,44.1,38.1]],"d":"N","dr":[46.1,31.0,31.8,31.0],"open":1},"bed1":{"r":[[0.0,34.8,22.6,34.3]],"d":"E","dr":[22.6,44.5,22.6,36.1]},"frd":{"r":[[0.0,26.2,18.7,8.6]],"d":"S","dr":[18.3,34.8,0.8,34.8]},"bath":{"r":[[0.0,0.0,19.5,26.2]],"d":"E","dr":[19.5,16.7,19.5,8.7]},"hall":{"r":[[19.5,0.0,14.3,31.0],[18.7,31.0,4.0,3.8]],"d":"N","dr":[29.8,0.0,21.0,0.0]},"kitchen":{"r":[[33.7,0.0,20.2,31.0]],"d":"W","dr":[33.7,29.8,33.7,0.0],"open":1}},"ent":[29.8,0.0,21.0,0.0],"block":[[54.0,0.0,41.3,31.0,"STAIR · LIFT"]]},"34":{"W":69.1,"H":69.1,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"living":{"r":[[28.6,40.1,40.5,29.0],[44.5,7.5,24.6,32.6],[31.0,7.5,13.5,12.3]],"d":"W","dr":[31.0,19.9,31.0,7.5],"open":1},"bed1":{"r":[[0.0,40.1,28.6,29.0]],"d":"E","dr":[28.6,50.7,28.6,42.9]},"frd":{"r":[[0.0,19.9,15.9,20.2]],"d":"N","dr":[10.5,19.9,2.5,19.9]},"bath":{"r":[[15.9,19.9,25.4,20.2]],"d":"N","dr":[31.9,19.9,23.8,19.9]},"kitchen":{"r":[[31.0,0.0,38.1,7.5]],"d":"S","dr":[69.1,7.5,31.0,7.5],"open":1},"hall":{"r":[[0.0,0.0,31.0,19.9]],"d":"N","dr":[11.1,0.0,1.6,0.0]}},"ent":[11.1,0.0,1.6,0.0],"block":[[41.3,19.9,3.2,14.3,""]]},"36":{"W":71.1,"H":52.8,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"bed1":{"r":[[0.0,0.0,34.5,24.2]],"d":"S","dr":[21.4,24.2,29.4,24.2]},"bath":{"r":[[0.0,27.0,19.9,25.8]],"d":"E","dr":[19.9,35.9,19.9,44.1]},"frd":{"r":[[19.9,46.1,14.7,6.7]],"d":"N","dr":[19.9,46.1,34.5,46.1]},"hall":{"r":[[34.5,15.1,29.4,12.7],[19.9,24.2,14.7,21.8]],"d":"N","dr":[44.9,15.1,54.0,15.1]},"living":{"r":[[34.5,27.8,29.4,25.0]],"d":"N","dr":[34.5,27.8,63.9,27.8],"open":1},"kitchen":{"r":[[63.9,15.1,7.1,37.7]],"d":"W","dr":[63.9,15.1,63.9,52.8],"open":1}},"ent":[44.9,15.1,54.0,15.1],"out":[[34.5,0.0,36.5,15.1]]},"37":{"W":48.4,"H":69.1,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"living":{"r":[[0.0,40.1,48.4,29.0],[0.0,19.9,15.9,20.2]],"d":"N","dr":[15.9,19.9,0.0,19.9],"open":1},"frd":{"r":[[41.3,19.9,7.1,13.9]],"d":"N","dr":[48.4,19.9,41.3,19.9]},"bath":{"r":[[15.9,19.9,25.4,20.2]],"d":"N","dr":[31.9,19.9,23.8,19.9]},"kitchen":{"r":[[23.8,0.0,24.6,19.9],[41.3,33.7,7.1,6.4]],"d":"W","dr":[23.8,19.9,23.8,0.0],"open":1},"hall":{"r":[[0.0,0.0,23.8,19.9]],"d":"N","dr":[12.7,0.0,4.0,0.0]}},"ent":[12.7,0.0,4.0,0.0]},"33":{"W":103.5,"H":37.1,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"frd":{"r":[[0.0,0.0,22.4,6.9]],"d":"S","dr":[0.8,6.9,22.2,6.9]},"bed1":{"r":[[0.0,6.9,22.4,30.2]],"d":"E","dr":[22.4,8.1,22.4,16.6]},"kitchen":{"r":[[22.4,0.0,54.8,10.3]],"d":"E","dr":[77.2,0.0,77.2,10.3],"open":1},"living":{"r":[[22.4,10.3,54.8,26.8]],"d":"N","dr":[23.2,10.3,77.2,10.3],"open":1},"hall":{"r":[[77.2,0.0,26.2,18.4]],"d":"N","dr":[81.8,0.0,91.0,0.0]},"bath":{"r":[[77.2,18.4,26.2,18.7]],"d":"N","dr":[86.8,18.4,94.8,18.4]}},"ent":[81.8,0.0,91.0,0.0]},"42":{"W":65.5,"H":40.5,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"living":{"r":[[25.8,7.5,39.7,33.0],[19.9,7.5,6.0,13.9]],"d":"W","dr":[19.9,7.5,19.9,21.4],"open":1},"kitchen":{"r":[[19.9,0.0,45.7,7.5]],"d":"S","dr":[64.3,7.5,19.9,7.5],"open":1},"hall":{"r":[[7.9,0.0,11.9,21.4]],"d":"N","dr":[19.5,0.0,10.3,0.0]},"frd":{"r":[[0.0,0.0,7.9,21.4]],"d":"E","dr":[7.9,0.8,7.9,21.0]},"bath":{"r":[[0.0,21.4,25.8,19.1]],"d":"N","dr":[16.7,21.4,7.9,21.4]}},"ent":[19.5,0.0,10.3,0.0]},"12":{"W":78.2,"H":40.5,"top":"CORRIDOR · ENTRANCE","bot":"FAÇADE","rooms":{"living":{"r":[[35.7,7.5,42.5,33.0],[25.8,21.4,9.9,19.1]],"d":"W","dr":[35.7,7.5,35.7,21.4],"open":1},"kitchen":{"r":[[35.7,0.0,42.5,7.5]],"d":"S","dr":[77.0,7.5,35.7,7.5],"open":1},"hall":{"r":[[7.1,0.0,28.6,21.4]],"d":"N","dr":[19.5,0.0,10.3,0.0]},"frd":{"r":[[0.0,0.0,7.1,21.4]],"d":"E","dr":[7.1,0.8,7.1,21.0]},"bath":{"r":[[0.0,21.4,25.8,19.1]],"d":"N","dr":[16.7,21.4,7.9,21.4]}},"ent":[19.5,0.0,10.3,0.0]}};
+SK["3"]=SK["4"];SK["7A"]=SK["7"];SK["7B"]=SK["7"];SK["14A"]=SK["14"];SK["14B"]=SK["14"];
+const SIDES=["N","E","S","W"];
+function wallSides(d){const i=SIDES.indexOf(d);return [SIDES[(i+1)%4],SIDES[(i+2)%4],SIDES[(i+3)%4],d]} /* W1..W4: W4 = door wall, W1 = left when facing in */
+function sketchSVG(a,typ,sel){const T=SK[typ];if(!T)return "";const M=Math.max(T.W,T.H),sc=820/M,pad=sel?48:14,lf=26,VW=T.W*sc+2*pad,VH=T.H*sc+2*pad+2*(lf+14)+20;
+ const X=x=>pad+x*sc,Y=y=>pad+lf+34+y*sc;
+ let s=`<svg viewBox="0 0 ${VW.toFixed(0)} ${VH.toFixed(0)}" role="img" aria-label="${sel?"Wall numbers for this room":"Apartment sketch. Tap a room."}">`;
+ s+=`<text x="${VW/2}" y="${pad+lf}" text-anchor="middle" class="l2" style="font-size:${lf}px">${T.top}</text><text x="${VW/2}" y="${VH-pad}" text-anchor="middle" class="l2" style="font-size:${lf}px">${T.bot}</text>`;
+ (T.block||[]).forEach(([x,y,w,h,t])=>{s+=`<rect class="blk" x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}"></rect>`;if(t)s+=`<text x="${X(x+w/2)}" y="${Y(y+h/2)+8}" text-anchor="middle" class="l2" style="font-size:${Math.min(lf,w*sc/(t.length*0.6))}px">${t}</text>`});
+ const rs=useApt(a.__id||curApt);const has=k=>rs.find(r=>r.k===k);
+ for(const k in T.rooms){if(!has(k))continue;const st=roomStat(a,k);const c=sel?(k===sel?"sel":"dim"):(st.complete?"done":"");
+  T.rooms[k].r.forEach(([x,y,w,h])=>{s+=sel?`<rect class="rm ${c}" x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}"></rect>`:`<rect class="rm ${c}" x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}" data-room="${k}" tabindex="0" role="button" aria-label="${esc(roomByK(k).name)}"></rect>`})}
+ /* door openings: gap in the wall + short leaf mark */
+ for(const k in T.rooms){if(!has(k))continue;const R=T.rooms[k],[x1,y1,x2,y2]=R.dr;s+=`<line class="dgap" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line>`;if(R.open)s+=`<line class="dopen" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line>`}
+ (T.opn||[]).forEach(([x1,y1,x2,y2])=>{s+=`<line class="dgap" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line><line class="dopen" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line>`});
+ if(T.ent){const [x1,y1,x2,y2]=T.ent;const mx=(X(x1)+X(x2))/2;s+=`<line class="dent" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line><path class="dent-a" d="M${mx-13} ${Y(y1)-26} L${mx+13} ${Y(y1)-26} L${mx} ${Y(y1)-8} Z"></path>`}
+ for(const k in T.rooms){if(!has(k))continue;const [x,y,w,h]=T.rooms[k].r[0];const st=roomStat(a,k);
+  if(!sel){const nm=(k==="bed1"&&!has("bed2"))?"Bed":({hall:"Hall",frd:"FRD",bath:"Bath",kitchen:"Kit.",living:"Living",bed1:"Bed 1",bed2:"Bed 2"})[k];const txt=nm+(st.complete?" ✓":"");
+   const fs=Math.max(15,Math.min(M*sc*0.045,w*sc/(txt.length*0.62),h*sc*0.55));s+=`<text x="${X(x+w/2)}" y="${Y(y+h/2)+fs*0.35}" text-anchor="middle" class="sk" style="font-size:${fs.toFixed(0)}px">${txt}</text>`;
+   if(st.defs){const cr=Math.min(16,h*sc*0.22);s+=`<g class="cnt"><circle cx="${X(x+w/2)}" cy="${Y(y+h/2)+fs*0.35+cr+4}" r="${cr}"></circle><text x="${X(x+w/2)}" y="${Y(y+h/2)+fs*0.35+cr*1.45+4}" text-anchor="middle" class="skn" style="font-size:${cr*1.25}px">${st.defs}</text></g>`}}
+  else if(k===sel){const bR=Math.max(30,Math.min(46,Math.min(w,h)*sc*0.2));const ws=wallSides(T.rooms[k].d);const mid={N:[x+w/2,y],S:[x+w/2,y+h],W:[x,y+h/2],E:[x+w,y+h/2]};
+   ws.forEach((sd,i)=>{const w0="W"+(i+1);const n=a.defects.filter(d=>d.room===k&&d.wall===w0).length;const [cx,cy]=mid[sd];
+    s+=`<g class="wb${n?" hit":""}"><circle cx="${X(cx)}" cy="${Y(cy)}" r="${bR}"></circle><text x="${X(cx)}" y="${Y(cy)+bR*0.32}" text-anchor="middle" class="skw" style="font-size:${bR*0.95}px">${w0}</text></g>`})}}
+ return s+"</svg>"}
+/* ===== views ===== */
+function viewSetup(){header("Who is recording?",S().me?"home":null);dock(null);curApt=null;const m=S().me||{name:"",company:""};
+ let co=m.company,nm=m.name;
+ const draw=()=>{const list=co?PEOPLE[co]:[];const other=nm&&!list.includes(nm);
+  $app.innerHTML=`<h1>Who is recording?</h1><p class="sub">Printed on every report you make.</p>
+  <div class="field"><label>Company</label><div class="choice">${["TLC","NT"].map(c=>`<button data-co="${c}" aria-pressed="${co===c}">${c}</button>`).join("")}</div></div>
+  ${co?`<div class="field"><label>Name</label><div class="chips">${list.map(n=>`<button class="chip el" data-nm="${esc(n)}" aria-pressed="${nm===n}">${esc(n)}</button>`).join("")}<button class="chip more" data-nm="__other" aria-pressed="${other}">Other name</button></div></div>
+  ${other||nm==="__other"?`<div class="field"><label for="nmo">Other name</label><input type="text" id="nmo" value="${other?esc(nm):""}" placeholder="First and last name"></div>`:""}`:""}
+  <button class="btn primary wide" id="saveMe">Continue</button>`;
+  $app.querySelectorAll("[data-co]").forEach(b=>b.onclick=()=>{if(co!==b.dataset.co){co=b.dataset.co;nm=""}draw()});
+  $app.querySelectorAll("[data-nm]").forEach(b=>b.onclick=()=>{nm=b.dataset.nm;draw();const f=document.getElementById("nmo");if(f)f.focus()});
+  const f=document.getElementById("nmo");if(f)f.addEventListener("input",()=>{nm=f.value||"__other"});
+  document.getElementById("saveMe").onclick=()=>{const name=(nm==="__other"?"":nm||"").trim();if(!co){toast("Choose TLC or NT");return}if(!name){toast("Choose or type your name");return}
+   S().me={name,company:co};saveState();location.hash="";route()}};
+ draw()}
+
+function viewHome(){curApt=null;curRoom=null;header("HUS B",null,["Statistics",()=>{location.hash="sum"}]);dock(null);const st=S();
+ let h=`<div class="row" style="justify-content:space-between;margin-bottom:6px"><p class="sub" style="margin:0">Recording as <b>${esc(st.me.name)}</b> (${esc(st.me.company)})</p><button class="btn" id="chg" style="min-height:38px;padding:6px 12px">Change</button></div>`;
+ const plans=[...new Set(APTS.map(x=>x.plan))];h+=`<div class="fchips" style="margin:8px 0">${plans.map(pl=>`<button class="chip" data-jump="${pl}">Plan ${pl}</button>`).join("")}</div>`;
+ plans.forEach(pl=>{const ap=APTS.filter(x=>x.plan===pl);const dn=ap.filter(x=>isSigned(A(x.id))||(V1_SIGNED[x.id]&&!A(x.id).startedAt)).length;
+ h+=`<h2 class="floorh" id="f${pl}">Plan ${pl} <span class="muted">· ${dn}/${ap.length} apartments signed</span></h2><div class="list">`;
+ ap.forEach(Pp=>{const a=A(Pp.id);const rc=ROOMS.filter(R=>roomStat(a,R.k).complete).length;const n=a.defects.length;const fin=aptComplete(a);const ms=elapsed(a);
+  const state=isSigned(a)?(revPending(a)?`<span class="pill warn">Revision to sign</span>`:a.sentAt?`<span class="pill ok">Signed${a.rev?" rev "+a.rev:""} · sent ✓</span>`:`<span class="pill acc">Signed – send report</span>`):fin?`<span class="pill ok">Finished · ${fmt(ms)} – sign</span>`:a.startedAt?`<span class="pill acc">${rc}/${ROOMS.length} rooms · ${fmt(ms)}</span>`:V1_SIGNED[Pp.id]?`<span class="pill ok">Signed 3–4 Nov (first app)</span>`:`<span class="pill">Not started</span>`;
+  h+=`<button class="card" data-apt="${Pp.id}"><span class="k">TYP ${Pp.typ} · ${Pp.rok} RoK · ${Pp.m2} m² · MODULES ${esc(Pp.mods)}</span><span class="big">LGH ${Pp.lgh}</span>
+   <span class="bar"><i style="width:${Math.round(100*rc/ROOMS.length)}%"></i></span><span class="pills">${state}${n?`<span class="pill nok">${n} defect${n>1?"s":""}</span>`:""}${naOpen(a).length?`<span class="pill warn">${naOpen(a).length} N/A</span>`:""}</span></button>`});
+ h+=`</div>`});
+ $app.innerHTML=h;
+ document.getElementById("chg").onclick=()=>{location.hash="me"};
+ $app.querySelectorAll("[data-jump]").forEach(b=>b.onclick=()=>{const e=document.getElementById("f"+b.dataset.jump);if(e)e.scrollIntoView({block:"start"})});
+}
+
+function viewApt(id){const Pp=aptById(id);const a=A(id);curApt=id;curRoom=null;header("LGH "+Pp.lgh,"home",null);
+ const rc=ROOMS.filter(R=>roomStat(a,R.k).complete).length;const all=rc===ROOMS.length;const nao=naOpen(a);const sg=isSigned(a);const rp=revPending(a);let h="";
+ if(V1_SIGNED[id]&&!a.startedAt)h+=`<div class="banner">Inspected and signed on 3–4 Nov with the first app version – the report is in the master file. Inspect again here only if agreed with NT.</div>`;
+ if(sg){h+=`<div class="box good" style="margin-bottom:12px"><b>Signed${a.rev?" · revision "+a.rev:""} – locked</b><span>${esc(a.signs.rec.name)} (${esc(a.signs.rec.company)}) and ${esc(a.signs.other.name)} (${esc(a.signs.other.company)}) · ${dtF(a.signedAt)}<br>Started ${dtF(a.startedAt)} · ${a.defects.length} defect${a.defects.length===1?"":"s"}${nao.length?` · ${nao.length} N/A`:""}<br>${a.sentAt?`Report sent ${dtF(a.sentAt)}`:"<b>Report not sent yet</b>"}</span></div>`;
+  if(rp)h+=`<div class="box warn" style="margin-bottom:12px"><b>2nd-round results not signed yet</b><span>Both inspectors sign revision ${nextRev(a)}; the report is then sent again.</span></div>`;
+  h+=`<button class="btn wide" id="share" style="margin-bottom:10px">${a.sentAt?"Send the report again":"Send report (PDF + CSV)"}</button>`}
+ else if(all)h+=`<div class="box good" style="margin-bottom:12px"><b>Walk-through finished – ready to sign</b><span>Started ${clock(a.startedAt)} · last room done ${clock(a.endedAt)} (${fmt(elapsed(a))}) · ${a.defects.length} defect${a.defects.length===1?"":"s"}${nao.length?` · ${nao.length} item${nao.length>1?"s":""} N/A`:""}</span></div>`;
+ if(all&&Object.keys(a.na).length)h+=`<button class="btn wide" id="r2" style="margin-bottom:12px">${nao.length?`2nd round: inspect the ${nao.length} N/A item${nao.length>1?"s":""}`:"2nd round – all N/A items inspected"}</button>`;
+ h+=`<p class="sub">TYP ${Pp.typ} · ${Pp.rok} RoK · ${Pp.m2} m² · modules ${esc(Pp.mods)}${Pp.note?`<br><span class="muted">${esc(Pp.note)}</span>`:""}</p>${SK[Pp.typ]?`<div class="plan">${sketchSVG(a,Pp.typ,null)}</div>`:""}`;
+ h+=`<div class="list" style="margin-top:12px">${ROOMS.map(R=>{const st=roomStat(a,R.k);const pill=st.complete?(st.defs?`<span class="pill nok">${st.defs} defect${st.defs>1?"s":""}</span>`:st.na?`<span class="pill warn">${st.na} N/A</span>`:`<span class="pill ok">All OK</span>`):st.done?`<span class="pill acc">${st.done}/${st.n}</span>`:`<span class="pill">${st.n} items</span>`;
+  return `<button class="rbtn${st.complete?" done":""}" data-room="${R.k}"><span>${esc(R.name)}${st.complete?" ✓":""}</span>${pill}</button>`}).join("")}</div>`;
+ $app.innerHTML=h;
+ if(!all)dock(`<div class="info"><b>${rc}/${ROOMS.length} rooms · ${a.defects.length} defect${a.defects.length===1?"":"s"}</b>Next: ${esc((ROOMS.find(R=>!roomStat(a,R.k).complete)||{name:""}).name)}</div><button class="btn primary" id="goNext">${a.startedAt?"Continue":"Start"}</button>`);
+ else if(!sg)dock(`<div class="info"><b>${a.defects.length} defect${a.defects.length===1?"":"s"}${nao.length?` · ${nao.length} N/A`:""}</b>Both inspectors sign</div><button class="btn go" id="toSign">Sign</button>`);
+ else if(rp)dock(`<div class="info"><b>2nd round changed</b>Sign the revision</div><button class="btn go" id="toSign">Sign revision ${nextRev(a)}</button>`);
+ else dock(`<div class="info"><b>Signed${a.rev?" rev "+a.rev:""}</b>${a.sentAt?"Report sent":"Send the report by e-mail"}</div><button class="btn primary" id="share2">${a.sentAt?"Send again":"Send report"}</button>`);
+ const gn=document.getElementById("goNext");if(gn)gn.onclick=()=>{const nx=ROOMS.find(R=>!roomStat(a,R.k).complete);location.hash=`r-${id}-${nx.k}`};
+ const ts=document.getElementById("toSign");if(ts)ts.onclick=()=>{SG=null;location.hash="s-"+id};
+ ["share","share2"].forEach(x=>{const b=document.getElementById(x);if(b)b.onclick=()=>shareReport(id)});
+ const r2=document.getElementById("r2");if(r2)r2.onclick=()=>{location.hash="n-"+id}}
+
+/* 2nd round: only the items that were N/A */
+function viewRound2(id){const Pp=aptById(id);const a=A(id);curApt=id;curRoom="__r2";header("2nd round · LGH "+Pp.lgh,"a-"+id,null);
+ const keys=Object.keys(a.na);let h=`<p class="sub">Items that could not be inspected the first time. Tap <b>OK</b> or tap the name to record a defect. The report is then reissued with these results.</p><div class="items">`;
+ keys.forEach(key=>{const [k,ii]=key.split(":");const i=+ii;const R=roomByK(k);const [name,pts]=R.items[i];const s=itemState(a,k,i);const ds=itemDefs(a,k,i).filter(d=>d.rnd===2);const open=openItem===key&&pts.length>1;
+  h+=`<div class="item s-${s}"><div class="ihead"><button class="iname" data-r2open="${key}"><b>${esc(R.name.replace(/ \(.*\)/,""))} · ${esc(name)}</b><small>${esc(ds.length?ds.map(d=>d.point+" – "+d.issue).join(" · "):s==="ok"?"OK in 2nd round":"N/A"+(a.na[key]?" – "+a.na[key]:""))}</small></button>`;
+  h+=ds.length?`<span class="nokb">NOT OK</span>`:`<button class="okb" data-r2ok="${key}" aria-pressed="${s==="ok"}">${s==="ok"?"OK ✓":"OK"}</button>`;h+=`</div>`;
+  if(open)h+=`<div class="pts">${pts.map((p,j)=>`<button class="pt" data-r2pt="${key}:${j}"><span>${esc(p)}</span><span class="stt">OK</span></button>`).join("")}</div>`;
+  if(ds.length)h+=`<div class="ddl">${ds.map(defRow).join("")}</div>`;h+=`</div>`});
+ $app.innerHTML=h+`</div>`;const left=naOpen(a).length;
+ dock(`<div class="info"><b>${keys.length-left}/${keys.length} done</b>${left?left+" still N/A":"Ready to reissue the report"}</div><button class="btn primary" id="r2back">${left?"Back":"Done"}</button>`);
+ document.getElementById("r2back").onclick=()=>{location.hash="a-"+id}}
+
+function viewRoom(id,k){const Pp=aptById(id);const a=A(id);const R=roomByK(k);if(curRoom!==k)openItem=null;curApt=id;curRoom=k;header(R.name,"a-"+id,null);const lk=isSigned(a);if(!lk)touch(a);
+ const st=roomStat(a,k);let h=lk?`<div class="box good" style="margin-bottom:10px"><b>Signed – locked</b><span>View only. Items that were N/A are done in the 2nd round from the apartment page.</span></div>`:`<p class="sub" style="margin-bottom:8px">LGH ${Pp.lgh} · tap <b>OK</b> if an item is fine, tap its name if something is wrong.</p>`;
+ if(false)h+=`<div class="plan mini">${planSVG(a,k)}</div><p class="hint" style="margin-top:6px">Doorway facing in: W1 on your left, then clockwise. W4 is the door wall.</p>`;
+ else if(SK[Pp.typ]&&SK[Pp.typ].rooms[k])h+=`<div class="plan mini">${sketchSVG(a,Pp.typ,k)}</div><p class="hint" style="margin-top:6px">Doorway facing in: W1 on your left, then clockwise. W4 is the door wall. Plan drawn to scale from the TLC module drawings.</p>`;
+ else h+=`<div class="wrule">${WRULE}<p class="hint">Stand in the doorway facing in: W1 is on your left, then clockwise. W4 is the wall with the door.</p></div>`;
+ h+=`<div class="items">`;
+ R.items.forEach(([name,pts],i)=>{const s=itemState(a,k,i);const ds=itemDefs(a,k,i);const single=pts.length===1;const open=openItem===i&&!single;
+  const sub=ds.length?ds.map(d=>(single?"":d.point+" – ")+d.issue).join(" · "):s==="na"?"N/A – not able to inspect"+(a.na[k+":"+i]?" ("+a.na[k+":"+i].toLowerCase()+")":""):single?"tap name if not OK":pts.join(" · ");
+  h+=`<div class="item s-${s}"><div class="ihead"><button class="iname" data-open="${i}" aria-expanded="${open}"><b>${esc(name)}</b><small>${esc(sub)}</small></button>`;
+  h+=ds.length?`<span class="nokb">NOT OK${ds.length>1?" ×"+ds.length:""}</span>`:`<button class="nab" data-na="${i}" aria-pressed="${s==="na"}">N/A</button><button class="okb" data-ok="${i}" aria-pressed="${s==="ok"}">${s==="ok"?"OK ✓":"OK"}</button>`;
+  h+=`</div>`;
+  if(s==="na")h+=`<div class="naw"><span class="lab">Reason (optional)</span><div class="chips">${NA_WHY.map(w=>`<button class="chip nac" data-why="${i}|${esc(w)}" aria-pressed="${a.na[k+":"+i]===w}">${esc(w)}</button>`).join("")}</div></div>`;
+  if(open){h+=`<div class="pts"><p class="hint">Tap the point that is not OK – the camera opens. All other points stay OK.</p>${pts.map((p,j)=>{const n=ds.filter(d=>d.j===j);/*per point*/
+    return `<button class="pt${n.length?" bad":""}" data-pt="${i}:${j}"><span>${esc(p)}</span><span class="stt">${n.length?"NOT OK"+(n.length>1?" ×"+n.length:""):"OK"}</span></button>`}).join("")}
+    <button class="pt add" data-ptother="${i}"><span>+ Other point (not in the list)</span></button>
+    ${ds.length?`<div class="ddl">${ds.map(defRow).join("")}</div>`:""}</div>`}
+  else if(ds.length)h+=`<div class="ddl">${ds.map(defRow).join("")}</div>`;
+  h+=`</div>`});
+ const oth=a.defects.filter(d=>d.room===k&&d.i===-1);
+ h+=`<div class="item${oth.length?" s-nok":""}"><div class="ihead"><button class="iname" data-otheritem="1"><b>+ Other item (not in the list)</b><small>${oth.length?oth.length+" recorded":"anything else you find in this room"}</small></button></div>${oth.length?`<div class="ddl">${oth.map(defRow).join("")}</div>`:""}</div>`;
+ h+=`</div>`;
+ $app.innerHTML=h;
+ const nx=ROOMS.find(x=>x.k!==k&&!roomStat(a,x.k).complete);
+ dock(`<div class="info"><b>${st.done}/${st.n} items · ${st.defs} defect${st.defs===1?"":"s"}</b>${st.complete?"Room complete":"Rest OK marks every untouched item OK"}</div>${st.complete?`<button class="btn primary" id="next">${nx?"Next room":"Finish"}</button>`:`<button class="btn go" id="restOk">Rest OK → next</button>`}`);
+ if(lk){$app.querySelectorAll(".items button").forEach(b=>b.disabled=true);dock(`<div class="info"><b>${st.n} items · ${st.defs} defect${st.defs===1?"":"s"}</b>Signed – view only</div><button class="btn primary" id="back2">Back</button>`);document.getElementById("back2").onclick=()=>{location.hash="a-"+id};return}
+ const go=()=>{location.hash=nx?`r-${id}-${nx.k}`:"a-"+id};
+ const ro=document.getElementById("restOk");if(ro)ro.onclick=()=>{R.items.forEach((_,i)=>{if(itemState(a,k,i)==="todo")a.ok[k+":"+i]=true});touch(a);saveState();toast(`${R.name}: done`);go()};
+ const nb=document.getElementById("next");if(nb)nb.onclick=go}
+function defRow(d){const img=firstPhoto(d)&&photoURL(firstPhoto(d));const np=(d.photos||[]).length;return `<button class="drow" data-edit="${d.id}">${img?`<img src="${img}" alt="">`:`<span class="noimg">no photo</span>`}<span class="t"><b>${esc(d.issue==="Other"&&d.note?d.note:d.issue)}</b><span>${d.i===-1?esc(d.item)+" · ":""}${esc(d.point)} · ${esc(d.sev)}${np>1?" · "+np+" photos":""}${d.rnd===2?" · 2nd round":""}${d.flag?" · ⚑ not agreed":""}${d.note?" · "+esc(d.note):""}</span></span>${d.wall?`<span class="tag">${esc(d.wall)}</span>`:""}</button>`}
+
+/* ===== interactions ===== */
+$app.addEventListener("click",e=>{const t=e.target.closest("button,[data-room]");if(!t)return;
+ if(t.dataset.apt){location.hash="a-"+t.dataset.apt;return}
+ if(t.dataset.room&&curApt&&!curRoom){location.hash=`r-${curApt}-${t.dataset.room}`;return}
+ if(curApt&&curRoom==="__r2"){const a=A(curApt);
+  if(t.dataset.r2ok){const key=t.dataset.r2ok;if(a.r2ok[key])delete a.r2ok[key];else a.r2ok[key]=Date.now();saveState();render();return}
+  if(t.dataset.r2open){const key=t.dataset.r2open;const [k,i]=key.split(":");const pts=roomByK(k).items[+i][1];if(pts.length===1){openCapture(curApt,k,+i,0,2);return}openItem=openItem===key?null:key;render();return}
+  if(t.dataset.r2pt){const [k,i,j]=t.dataset.r2pt.split(":");openCapture(curApt,k,+i,+j,2);return}
+  if(t.dataset.edit){const d=a.defects.find(x=>x.id===t.dataset.edit);if(d)openEdit(curApt,d);return}
+  return}
+ if(!curApt||!curRoom||curRoom==="__sign")return;const a=A(curApt);const k=curRoom;const R=roomByK(k);if(isSigned(a)){toast("Signed – locked");return}
+ if(t.dataset.ok){const i=+t.dataset.ok;const key=k+":"+i;if(a.ok[key])delete a.ok[key];else{a.ok[key]=true;delete a.na[key]}if(openItem===i)openItem=null;touch(a);saveState();render();return}
+ if(t.dataset.na){const i=+t.dataset.na;const key=k+":"+i;if(key in a.na)delete a.na[key];else{a.na[key]="";delete a.ok[key]}if(openItem===i)openItem=null;touch(a);saveState();render();return}
+ if(t.dataset.why){const [i,w]=t.dataset.why.split("|");const key=k+":"+i;a.na[key]=a.na[key]===w?"":w;saveState();render();return}
+ if(t.dataset.ptother){openCapture(curApt,k,+t.dataset.ptother,-1);return}
+ if(t.dataset.otheritem){openCapture(curApt,k,-1,-1);return}
+ if(t.dataset.open){const i=+t.dataset.open;const pts=R.items[i][1];if(pts.length===1&&!itemDefs(a,k,i).length){openCapture(curApt,k,i,0);return}
+  openItem=openItem===i?null:i;render();return}
+ if(t.dataset.pt){const [i,j]=t.dataset.pt.split(":").map(Number);openCapture(curApt,k,i,j);return}
+ if(t.dataset.edit){const d=a.defects.find(x=>x.id===t.dataset.edit);if(d)openEdit(curApt,d);return}});
+$app.addEventListener("keydown",e=>{const p=e.target.closest&&e.target.closest("polygon[data-room],rect[data-room]");if(p&&(e.key==="Enter"||e.key===" ")){e.preventDefault();p.dispatchEvent(new MouseEvent("click",{bubbles:true}))}});
+
+/* ===== capture sheet: several defects with the same photos, as many photos as needed ===== */
+const $sheet=document.getElementById("sheet");const cam=document.getElementById("cam");
+let C=null; /* the defect(s) being recorded */
+function openCapture(apt,room,i,j,rnd){const a=A(apt);touch(a);const it=i>=0?roomByK(room).items[i]:["",[]];const item=it[0],pts=it[1];
+ C={apt,room,i,j,rnd:rnd||1,item,point:j>=0?pts[j]:"",customItem:i<0,customPoint:j<0,editId:null,orig:[],photos:[],ps:"wait",issues:[],sev:null,sevTouched:false,flag:false,note:""};
+ renderSheet();$sheet.hidden=false;try{cam.value=""}catch(e){}
+ cam.click()} /* camera opens in the same tap */
+function openEdit(apt,d){const ph=d.photos?d.photos.slice():(d.photo?[d.photo]:[]);
+ C={apt,room:d.room,i:d.i,j:d.j,rnd:d.rnd||1,item:d.item,point:d.point,customItem:d.i<0,customPoint:d.j<0,editId:d.id,orig:ph.slice(),photos:ph,ps:"ok",issues:[d.issue],sev:d.sev,sevTouched:true,flag:d.flag,note:d.note||""};renderSheet();$sheet.hidden=false}
+function closeSheet(){$sheet.hidden=true;$sheet.innerHTML="";C=null;render()}
+const photoInUse=id=>Object.values(S().apts).some(a=>a.defects.some(d=>(d.photos||[]).includes(id)||d.photo===id));
+cam.addEventListener("change",async()=>{const f=cam.files&&cam.files[0];if(!f||!C)return;const mine=C;
+ const id=newId("p");mine.photos.push(id);mine.ps="saving";mem.photos[id]=f;renderPhoto();
+ const okRaw=await put("photos",id,f); /* 1. keep the original at once */
+ try{const small=await shrink(f);if(small&&small!==f){mem.photos[id]=small;if(urlCache[id]){URL.revokeObjectURL(urlCache[id]);delete urlCache[id]}await put("photos",id,small)}}catch(e){}
+ mine.ps=okRaw?"ok":"mem";if(C===mine)renderPhoto();try{cam.value=""}catch(e){}});
+async function shrink(file){const MAX=1600;
+ try{if("createImageBitmap" in window){const bmp=await createImageBitmap(file);const k=Math.min(1,MAX/Math.max(bmp.width,bmp.height));const c=document.createElement("canvas");c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);bmp.close&&bmp.close();
+  const b=await new Promise(r=>c.toBlob(r,"image/jpeg",0.78));if(b)return b}}catch(e){}
+ const url=URL.createObjectURL(file);try{const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=url});
+  const k=Math.min(1,MAX/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  return await new Promise(r=>c.toBlob(b=>r(b||file),"image/jpeg",0.78))}catch(e){return file}finally{URL.revokeObjectURL(url)}}
+function photoHTML(){const n=C.photos.length;
+ const st=C.ps==="saving"?`<span class="st-wait">Saving photo…</span>`:C.ps==="mem"?`<span class="st-wait">Photo kept – phone storage unavailable</span>`:n?`<span class="st-ok">${n} photo${n>1?"s":""} saved ✓</span>`:`<span class="st-wait">${C.ps==="wait"?"Take the photo…":"No photo"}</span>`;
+ return `<div class="phstrip">${C.photos.map(id=>`<span class="phw"><img class="th" src="${photoURL(id)}" alt="Defect photo"><button class="phx" data-rmph="${id}" aria-label="Remove photo">×</button></span>`).join("")}<button class="addph2" data-x="addph">＋<small>${n?"Add photo":"Take photo"}</small></button></div><span class="st">${st}</span>`}
+function renderPhoto(){const b=document.getElementById("phbox");if(b)b.innerHTML=photoHTML()}
+function renderSheet(){const R=roomByK(C.room);const iss=C.customPoint?issuesFor("~"):issuesFor(C.point,C.item);const multi=!C.editId;const n=C.issues.length;
+ const title=C.customItem?(C.item||"Other item"):C.item+(C.customPoint?" · "+(C.point||"other point"):C.point.toLowerCase()!==C.item.toLowerCase()?" · "+C.point:"");
+ $sheet.innerHTML=`<div class="sh-head"><div class="in"><button class="back" data-x="cancel" aria-label="Cancel">✕</button><div class="ttl"><span class="app">${C.editId?"EDIT":"NOT OK"}${C.rnd===2?" · 2ND ROUND":""} · ${esc(R.name.toUpperCase())}</span><b>${esc(title)}</b></div></div></div>
+ <div class="sh-scroll"><div class="sh-body">
+  <div class="phbox" id="phbox">${photoHTML()}</div>
+  ${C.customItem?`<div class="field" style="margin:0"><label for="citem">Item – what is it?</label><input type="text" id="citem" value="${esc(C.item)}" placeholder="e.g. Socket, Light switch, Smoke detector"></div>`:""}
+  ${C.customPoint?`<div class="field" style="margin:0"><label for="cpoint">${C.customItem?"Where / which part (optional)":"Point – which part?"}</label><input type="text" id="cpoint" value="${esc(C.point)}" placeholder="e.g. hinge, lock, cover plate"></div>`:""}
+  <div class="grp"><span class="lab">What is wrong?${multi?" Tick all that apply":""}</span><div class="chips">${iss.map(x=>`<button class="chip" data-iss="${esc(x)}" aria-pressed="${C.issues.includes(x)}">${esc(x)}</button>`).join("")}</div></div>
+  ${n?`<div class="grp"><span class="lab">Severity${n>1?" (for all ticked)":""}</span><div class="seg3">${SEV.map(s=>`<button data-sev="${s}" aria-pressed="${C.sevTouched?C.sev===s:(n===1&&defaultSev(C.issues[0])===s)}">${s}</button>`).join("")}</div></div>
+  <button class="flag" data-x="flag" aria-pressed="${C.flag}">⚑ Not agreed by the other company</button>
+  <div class="field" style="margin:0"><label for="dnote">${C.issues.includes("Other")?"Describe the defect":"Note (optional)"} – use the mic on your keyboard to speak</label><input type="text" id="dnote" value="${esc(C.note)}" placeholder="e.g. 30 cm above the socket"></div>`:""}
+ </div></div>
+ <div class="sh-foot"><div class="in">${C.editId?`<button class="btn danger" data-x="delete">Delete</button>`:""}<button class="btn primary" data-x="save"${n?"":" disabled"}>${n?(n>1?`Save ${n} defects – rest stays OK`:"Save – rest stays OK"):"Choose what is wrong"}</button></div></div>`;
+ const nt=document.getElementById("dnote");if(nt)nt.addEventListener("input",()=>{C.note=nt.value});
+ const ci=document.getElementById("citem");if(ci)ci.addEventListener("input",()=>{C.item=ci.value});
+ const cp=document.getElementById("cpoint");if(cp)cp.addEventListener("input",()=>{C.point=cp.value})}
+$sheet.addEventListener("click",e=>{const t=e.target.closest("button");if(!t||!C)return;
+ if(t.dataset.iss){const x=t.dataset.iss;if(C.editId)C.issues=[x];else C.issues=C.issues.includes(x)?C.issues.filter(y=>y!==x):C.issues.concat([x]);renderSheet();return}
+ if(t.dataset.sev){C.sev=t.dataset.sev;C.sevTouched=true;renderSheet();return}
+ if(t.dataset.rmph){const id=t.dataset.rmph;C.photos=C.photos.filter(x=>x!==id);if(!C.orig.includes(id))del("photos",id);renderPhoto();return}
+ const x=t.dataset.x;
+ if(x==="flag"){C.flag=!C.flag;t.setAttribute("aria-pressed",C.flag);return}
+ if(x==="addph"){try{cam.value=""}catch(e){}cam.click();return}
+ if(x==="cancel"){C.photos.filter(id=>!C.orig.includes(id)).forEach(id=>del("photos",id));closeSheet();return}
+ if(x==="delete"){const a=A(C.apt);a.defects=a.defects.filter(z=>z.id!==C.editId);C.orig.concat(C.photos).forEach(id=>{if(!photoInUse(id))del("photos",id)});touch(a);saveState();toast("Defect deleted");closeSheet();return}
+ if(x==="save"){commit();return}});
+function commit(){if(!C.issues.length)return;const a=A(C.apt);const st=S();
+ C.item=(C.item||"").trim();C.point=(C.point||"").trim();
+ if(C.customItem&&!C.item){toast("Type what the item is");const f=document.getElementById("citem");if(f)f.focus();return}
+ if(C.customPoint&&!C.customItem&&!C.point){toast("Type which part is not OK");const f=document.getElementById("cpoint");if(f)f.focus();return}
+ if(C.issues.includes("Other")&&!(C.note||"").trim()){toast("Describe the defect in the note");const f=document.getElementById("dnote");if(f)f.focus();return}
+ if(C.customItem&&!C.point)C.point="(other item)";
+ const mk=(issue,id)=>({id,room:C.room,i:C.i,j:C.j,rnd:C.rnd,item:C.item,point:C.point,wall:wallOf(C.point),issue,cat:catOf(issue),sev:C.sevTouched?C.sev:defaultSev(issue),trade:trade(C.item,C.point,issue),flag:!!C.flag,note:(C.note||"").trim(),photos:C.photos.slice(),at:Date.now(),by:st.me?st.me.name:""});
+ if(C.editId){const ix=a.defects.findIndex(z=>z.id===C.editId);const rec=mk(C.issues[0],C.editId);if(ix>=0){rec.at=a.defects[ix].at;a.defects[ix]=rec}C.orig.filter(id=>!C.photos.includes(id)).forEach(id=>{if(!photoInUse(id))del("photos",id)})}
+ else C.issues.forEach(issue=>a.defects.push(mk(issue,newId("d"))));
+ if(C.i>=0){delete a.ok[C.room+":"+C.i];if(C.rnd!==2){delete a.na[C.room+":"+C.i];openItem=roomByK(C.room).items[C.i][1].length>1?C.i:null}else delete a.r2ok[C.room+":"+C.i]}touch(a);saveState();
+ toast(`Saved · ${C.item} – ${C.issues.join(", ")}${C.photos.length?"":" (no photo)"}`);closeSheet()}
+
+/* ===== statistics ===== */
+let fCat="All";
+function allRows(){const out=[];APTS.forEach(Pp=>{const a=(useApt(Pp.id),S().apts[Pp.id]);if(!a)return;a.defects.forEach(d=>out.push(Object.assign({apt:Pp.id,lgh:Pp.lgh,mods:Pp.mods,example:!!a.example},d)))});return out}
+function inspectedApts(){return APTS.filter(Pp=>{const a=(useApt(Pp.id),S().apts[Pp.id]);return a&&(a.defects.length||Object.keys(a.ok).length||Object.keys(a.na||{}).length)})}
+function hbars(pairs,cls){const max=Math.max(1,...pairs.map(p=>p[1]));return `<div class="hbars">${pairs.map(([l,n])=>`<div class="hb"><span class="lbl">${esc(l)}</span><span class="num">${n}</span><span class="trk"><i class="${cls||""}" style="width:${Math.round(100*n/max)}%"></i></span></div>`).join("")}</div>`}
+function count(rows,fn){const m=new Map();rows.forEach(r=>{const k=fn(r);m.set(k,(m.get(k)||0)+1)});return [...m.entries()].sort((a,b)=>b[1]-a[1])}
+function naList(){const out=[];inspectedApts().forEach(Pp=>{const a=(useApt(Pp.id),S().apts[Pp.id]);ROOMS.forEach(R=>R.items.forEach(([name],i)=>{if(itemState(a,R.k,i)==="na")out.push({lgh:Pp.lgh,room:R.name.replace(/ \(.*\)/,""),item:name,why:a.na[R.k+":"+i]})}))});return out}
+function viewSum(){curApt=null;curRoom=null;header("Statistics","home",null);dock(`<div class="info"><b>Excel export</b>Checklist + one row per defect</div><button class="btn primary" id="xl">Export Excel</button>`);
+ const all=allRows();const ins=inspectedApts();const rows=fCat==="All"?all:all.filter(r=>r.cat===fCat);
+ const fin=ins.map(Pp=>{useApt(Pp.id);const a=S().apts[Pp.id];return aptComplete(a)&&a.startedAt?a:null}).filter(Boolean);const avgT=fin.length?fin.reduce((s,a)=>s+elapsed(a),0)/fin.length:0;
+ 
+ let h=`<p class="sub">Built from every apartment inspected on this phone.</p>`;
+ h+=`<div class="kpis"><div class="kpi"><b>${ins.length}</b><span>apartments inspected</span></div><div class="kpi"><b>${all.length}</b><span>defects recorded</span></div>
+  <div class="kpi"><b>${naList().length}</b><span>items N/A – to inspect later</span></div><div class="kpi"><b>${fin.length?fmt(avgT):"–"}</b><span>average time per apartment (target 10:00)</span></div></div>`;
+ if(!all.length){$app.innerHTML=h+`<div class="box" style="margin-top:14px"><b>No defects yet</b><span>Inspect an apartment first.</span></div>`;bindXl();return}
+ const cats=["All",...count(all,r=>r.cat).map(x=>x[0])];
+ h+=`<h2>Which wall?</h2><div class="fchips" role="group" aria-label="Filter by defect">${cats.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${fCat===c}">${esc(c)}</button>`).join("")}</div>`;
+ const cols=["W1","W2","W3","W4","Corner","Other"];const colOf=r=>/^W\d$/.test(r.wall)?r.wall:r.wall?"Corner":"Other";
+ const grid={};rows.forEach(r=>{grid[r.room]=grid[r.room]||{};const c=colOf(r);grid[r.room][c]=(grid[r.room][c]||0)+1});
+ const wallVals=Object.values(grid).flatMap(o=>["W1","W2","W3","W4"].map(c=>o[c]||0));const mx=Math.max(1,...wallVals);
+ h+=`<div class="tbl" style="margin-top:8px"><table><thead><tr><th>Room</th>${cols.map(c=>`<th>${c==="Corner"?"Crn":c==="Other"?"Oth":c}</th>`).join("")}<th>Tot</th></tr></thead><tbody>`;
+ ALLR.forEach(k=>{const R={k,name:RNAME[k]};const g=grid[R.k]||{};const tot=Object.values(g).reduce((s,n)=>s+n,0);if(!tot)return;
+  h+=`<tr><td>${esc(R.name.replace(/ \(.*\)/,""))}</td>${cols.map(c=>{const n=g[c]||0;const wall=/^W/.test(c);return `<td class="${!n?"z":wall&&n>=mx&&mx>1?"h2":wall&&n>1?"h1":""}">${n||"·"}</td>`}).join("")}<td><b>${tot}</b></td></tr>`});
+ h+=`</tbody></table></div><p class="hint" style="margin-top:6px">Darkest cell = the wall with the most ${fCat==="All"?"defects":fCat.toLowerCase()+" defects"}. Crn = corners (W1-W2 …), Oth = doors, windows, floors, fittings.</p>`;
+ h+=`<h2>Points that fail most</h2>${hbars(count(rows,r=>`${RNAME[r.room].replace(/ \(.*\)/,"")} · ${r.item} · ${r.point}`).slice(0,8))}`;
+ h+=`<h2>Most frequent defects</h2>${hbars(count(rows,r=>r.issue).slice(0,8))}`;
+ if(ins.length>=2){const m=new Map();all.forEach(r=>{const key=`${RNAME[r.room].replace(/ \(.*\)/,"")} · ${r.item} · ${r.point} · ${r.issue}`;if(!m.has(key))m.set(key,new Set());m.get(key).add(r.apt)});
+  const sys=[...m.entries()].map(([kk,s])=>[kk,s.size]).filter(x=>x[1]>=2).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  h+=`<h2>Repeats in several apartments</h2><p class="hint" style="margin-bottom:8px">Same defect on the same point in more than one apartment – a sign of a production or transport cause, not site.</p>`;
+  h+=sys.length?`<div class="sys">${sys.map(([kk,n])=>`<div><span>${esc(kk)}</span><b>${n}/${ins.length}</b></div>`).join("")}</div>`:`<p class="muted">None yet.</p>`}
+ const nl=naList();if(nl.length)h+=`<h2>To inspect later (N/A)</h2><div class="sys">${nl.slice(0,12).map(x=>`<div><span>LGH ${esc(x.lgh)} · ${esc(x.room)} · ${esc(x.item)}</span><b style="color:var(--muted)">${esc(x.why||"–")}</b></div>`).join("")}</div>${nl.length>12?`<p class="hint">+ ${nl.length-12} more in the Excel file</p>`:""}`;
+ h+=`<h2>Work by trade</h2>${hbars(count(rows,r=>r.trade),"tr")}`;
+ h+=`<h2>By severity</h2>${hbars(SEV.map(s=>[s,rows.filter(r=>r.sev===s).length]),"tr")}`;
+ $app.innerHTML=h;
+ $app.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{fCat=b.dataset.f;const y=window.scrollY;viewSum();window.scrollTo(0,y)});
+ bindXl()}
+
+function loadXLSX(){return window.XLSX?Promise.resolve(window.XLSX):Promise.reject(new Error("xlsx not loaded"))}
+function bindXl(){const b=document.getElementById("xl");if(!b)return;b.onclick=async()=>{const ins=inspectedApts();if(!ins.length){toast("Nothing inspected yet");return}
+ b.disabled=true;b.textContent="Preparing…";
+ try{const X=await loadXLSX();const rows=allRows();
+  const defects=rows.map(r=>({"LGH":r.lgh,"Modules":r.mods,"Room":RNAME[r.room],"Item":r.item,"Point":r.point,"Wall":r.wall,"Defect":r.issue==="Other"?r.note:r.issue,"Category":r.cat,"Severity":r.sev,"Trade":r.trade,"Not agreed":r.flag?"YES":"","Note":r.note||"","Photos":(r.photos||[]).length||"","Round":r.rnd===2?"2nd":"1st","Recorded by":r.by||"","Date":new Date(r.at).toLocaleString()}));
+  const check=[];ins.forEach(Pp=>{const a=(useApt(Pp.id),S().apts[Pp.id]);ROOMS.forEach(R=>R.items.forEach(([name,pts],i)=>{const s=itemState(a,R.k,i);pts.forEach((p,j)=>{const ds=a.defects.filter(d=>d.room===R.k&&d.i===i&&d.j===j);
+   check.push({"LGH":Pp.lgh,"Modules":Pp.mods,"Room":R.name,"Item":name,"Point":p,"Result":ds.length?"NOT OK":s==="todo"?"not checked":s==="na"?"N/A":((R.k+":"+i) in a.na)?"OK (2nd round)":"OK","Defect / reason":ds.length?ds.map(d=>d.issue==="Other"?d.note:d.issue).join(", "):s==="na"?(a.na[R.k+":"+i]||""):""})});
+   a.defects.filter(d=>d.room===R.k&&d.i===i&&d.j===-1).forEach(d=>check.push({"LGH":Pp.lgh,"Modules":Pp.mods,"Room":R.name,"Item":name,"Point":d.point+" (other)","Result":"NOT OK","Defect / reason":d.issue==="Other"?d.note:d.issue}))}));
+   a.defects.filter(d=>d.i===-1).forEach(d=>check.push({"LGH":Pp.lgh,"Modules":Pp.mods,"Room":RNAME[d.room],"Item":d.item+" (other)","Point":d.point,"Result":"NOT OK","Defect / reason":d.issue==="Other"?d.note:d.issue}))});
+  const wb=X.utils.book_new();
+  const w1=X.utils.json_to_sheet(defects);w1["!cols"]=[7,10,16,24,24,7,20,10,10,18,10,24,7,6,16,18].map(w=>({wch:w}));X.utils.book_append_sheet(wb,w1,"Defects");
+  const w2=X.utils.json_to_sheet(check);w2["!cols"]=[7,10,16,26,30,11,24].map(w=>({wch:w}));X.utils.book_append_sheet(wb,w2,"Checklist");
+  const sum=[["Room","Item","Point","Defects"],...count(rows,r=>RNAME[r.room]+"|"+r.item+"|"+r.point).map(([kk,n])=>[...kk.split("|"),n]),[],["Defect","Count"],...count(rows,r=>r.issue),[],["Trade","Count"],...count(rows,r=>r.trade)];
+  const w4=X.utils.json_to_sheet(ins.flatMap(aptRows));X.utils.book_append_sheet(wb,w4,"All points");const w3=X.utils.aoa_to_sheet(sum);w3["!cols"]=[{wch:18},{wch:26},{wch:30},{wch:8}];X.utils.book_append_sheet(wb,w3,"Summary");
+  const buf=X.write(wb,{bookType:"xlsx",type:"array"});
+  saveBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),`Herakles HUS B inspections ${new Date().toISOString().slice(0,10)}.xlsx`);toast("Excel saved to Downloads")}
+ catch(e){console.error(e);toast("Could not create the Excel file")}
+ finally{b.disabled=false;b.textContent="Export Excel"}}}
+
+/* ===== signing, lock, report (PDF + CSV), share ===== */
+const V1_SIGNED={"1108-1117":1,"1109-1115":1,"1110-1113":1,"1212-1217":1,"1213-1215":1,"1214-1213":1};
+const isSigned=a=>!!a.signedAt;
+const r2Key=a=>Object.keys(a.r2ok||{}).sort().join(",")+"|"+a.defects.filter(d=>d.rnd===2).map(d=>[d.id,d.issue,d.sev,(d.photos||[]).length,d.flag?1:0,d.note,d.point].join("~")).sort().join(",");
+const revPending=a=>isSigned(a)&&r2Key(a)!==(a.r2key||"");
+const nextRev=a=>isSigned(a)?(a.rev||0)+1:0;
+const dtF=t=>t?new Date(t).toLocaleString("sv-SE",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):"–";
+const issueTxt=d=>d.issue==="Other"&&d.note?d.note:d.issue;
+function aptStat(a){let n=0,ok=0,nok=0,na=0,r2=0;ROOMS.forEach(R=>R.items.forEach((_,i)=>{n++;const s=itemState(a,R.k,i);if(s==="ok"){ok++;if((R.k+":"+i) in a.na)r2++}else if(s==="nok")nok++;else if(s==="na")na++}));
+ return {n,ok,nok,na,r2,defs:a.defects.length,flag:a.defects.filter(d=>d.flag).length}}
+function orderedDefs(a){const ord=ROOMS.map(R=>R.k);return a.defects.slice().sort((x,y)=>(ord.indexOf(x.room)-ord.indexOf(y.room))||((x.i<0?999:x.i)-(y.i<0?999:y.i))||((x.j<0?999:x.j)-(y.j<0?999:y.j))||(x.at-y.at))}
+const resultTxt=(a,k,i)=>{const s=itemState(a,k,i);const na=(k+":"+i) in a.na;const r2=itemDefs(a,k,i).some(d=>d.rnd===2);
+ return s==="ok"?(na?"OK (2nd round)":"OK"):s==="nok"?(r2?"NOT OK (2nd round)":"NOT OK"):s==="na"?"N/A":"not checked"};
+
+/* signature pad */
+function makePad(c,onInk){const dpr=window.devicePixelRatio||1;const rc=c.getBoundingClientRect();c.width=rc.width*dpr;c.height=rc.height*dpr;const g=c.getContext("2d");g.scale(dpr,dpr);
+ g.lineWidth=2.6;g.lineCap="round";g.lineJoin="round";g.strokeStyle="#111";let dn=false,last=null,ink=false;const pt=e=>{const b=c.getBoundingClientRect();return [e.clientX-b.left,e.clientY-b.top]};
+ c.addEventListener("pointerdown",e=>{dn=true;last=pt(e);try{c.setPointerCapture(e.pointerId)}catch(x){}});
+ c.addEventListener("pointermove",e=>{if(!dn)return;const p=pt(e);g.beginPath();g.moveTo(last[0],last[1]);g.lineTo(p[0],p[1]);g.stroke();last=p;if(!ink){ink=true;onInk()}});
+ c.addEventListener("pointerup",()=>{dn=false});c.addEventListener("pointercancel",()=>{dn=false});
+ return {clear(){g.clearRect(0,0,c.width,c.height);ink=false},png(){const o=document.createElement("canvas");o.width=480;o.height=Math.round(480*rc.height/rc.width);const og=o.getContext("2d");og.fillStyle="#fff";og.fillRect(0,0,o.width,o.height);og.drawImage(c,0,0,o.width,o.height);return o.toDataURL("image/png")}}}
+
+let SG=null; /* signing in progress */
+function viewSign(id){const Pp=aptById(id);const a=A(id);curApt=id;curRoom="__sign";
+ if(!aptComplete(a)||(isSigned(a)&&!revPending(a))){location.hash="a-"+id;return}
+ const rv=nextRev(a);header((rv?"Revision "+rv:"Sign")+" · LGH "+Pp.lgh,"a-"+id,null);
+ const m=S().me;if(!SG||SG.apt!==id)SG={apt:id,rec:null,co:m.company==="TLC"?"NT":"TLC",name:""};
+ const st=aptStat(a);const nao=naOpen(a);
+ let h=`<div class="box"><b>Summary${rv?" · revision "+rv:""}</b><span>${st.n} items · ${st.ok} OK · <b style="color:var(--nok)">${st.nok} NOT OK</b> · ${st.na} N/A<br>${st.defs} defect${st.defs===1?"":"s"} recorded${st.flag?` · ${st.flag} not agreed`:""}${rv?` · 2nd round: ${st.r2} OK`:""}<br>Started ${dtF(a.startedAt)} · walk-through finished ${dtF(a.endedAt)}</span></div>`;
+ if(!SG.rec){h+=`<h2 style="margin-top:16px"><span class="step">STEP 1 OF 2</span><br>Recorder signs</h2><p class="sub">${esc(m.name)} (${esc(m.company)}) confirms the inspection of LGH ${esc(Pp.lgh)} (modules ${esc(Pp.mods)}) was done jointly and every point is recorded${rv?", including the 2nd-round results":""}.</p>
+  <canvas class="pad" id="pad" aria-label="Signature pad"></canvas><div class="row" style="margin-top:8px"><button class="btn" id="clr">Clear</button></div>`;
+  $app.innerHTML=h;dock(`<div class="info"><b>Step 1 of 2</b>Sign with your finger</div><button class="btn go" id="ok" disabled>Sign</button>`)}
+ else{const list=PEOPLE[SG.co]||[];const other=SG.name&&!list.includes(SG.name);
+  h+=`<div class="box"><span class="muted">Signed by</span><b>${esc(SG.rec.name)} (${esc(SG.rec.company)})</b><img class="sigshow" src="${SG.rec.sig}" alt="Recorder signature"></div>
+  <h2 style="margin-top:16px"><span class="step">STEP 2 OF 2</span><br>Hand the phone to the other company</h2>
+  <div class="field"><label>Company</label><div class="choice">${["TLC","NT"].map(c=>`<button data-sco="${c}" aria-pressed="${SG.co===c}">${c}</button>`).join("")}</div></div>
+  <div class="field"><label>Name</label><div class="chips">${list.map(n=>`<button class="chip el" data-snm="${esc(n)}" aria-pressed="${SG.name===n}">${esc(n)}</button>`).join("")}<button class="chip more" data-snm="__other" aria-pressed="${other||SG.name==="__other"}">Other name</button></div></div>
+  ${other||SG.name==="__other"?`<div class="field"><label for="son">Other name</label><input type="text" id="son" value="${other?esc(SG.name):""}" placeholder="First and last name"></div>`:""}
+  <canvas class="pad" id="pad" aria-label="Signature pad"></canvas><div class="row" style="margin-top:8px"><button class="btn" id="clr">Clear</button><button class="btn" id="redo">Recorder signs again</button></div>`;
+  $app.innerHTML=h;dock(`<div class="info"><b>Step 2 of 2</b>Name and signature</div><button class="btn go" id="ok" disabled>Sign &amp; lock</button>`);
+  $app.querySelectorAll("[data-sco]").forEach(b=>b.onclick=()=>{if(SG.co!==b.dataset.sco){SG.co=b.dataset.sco;SG.name=""}viewSign(id)});
+  $app.querySelectorAll("[data-snm]").forEach(b=>b.onclick=()=>{SG.name=b.dataset.snm;viewSign(id);const f=document.getElementById("son");if(f)f.focus()});
+  const so=document.getElementById("son");if(so)so.addEventListener("input",()=>{SG.name=so.value||"__other"});
+  document.getElementById("redo").onclick=()=>{SG.rec=null;viewSign(id)}}
+ const ok=document.getElementById("ok");const pad=makePad(document.getElementById("pad"),()=>{ok.disabled=false});
+ document.getElementById("clr").onclick=()=>{pad.clear();ok.disabled=true};
+ ok.onclick=()=>{if(!SG.rec){SG.rec={name:m.name,company:m.company,sig:pad.png(),at:Date.now()};window.scrollTo(0,0);viewSign(id);return}
+  const nm=(SG.name==="__other"?"":SG.name||"").trim();if(!nm){toast("Choose or type the name of the person signing");return}
+  const now=Date.now();const oth={name:nm,company:SG.co,sig:pad.png(),at:now};
+  a.history=(a.history||[]).concat([{rev:rv,signedAt:now,rec:{name:SG.rec.name,company:SG.rec.company,at:SG.rec.at},other:{name:nm,company:SG.co,at:now}}]);
+  a.signs={rec:SG.rec,other:oth};a.signedAt=now;a.rev=rv;a.r2key=r2Key(a);a.sentAt=null;SG=null;saveState();
+  location.hash="a-"+id;toast(rv?`Revision ${rv} signed – send the report again`:"Signed and locked – send the report")}}
+
+/* sketch as an image for the report */
+function sketchPNG(a,typ,id){return new Promise(res=>{const T=SK[typ];if(!T)return res(null);const M=Math.max(T.W,T.H),sc=900/M,pad=24,lf=26;
+ const VW=Math.round(T.W*sc+2*pad),VH=Math.round(T.H*sc+2*pad+2*(lf+12)+22);const X=x=>pad+x*sc,Y=y=>pad+lf+34+y*sc;const F="Arial,Helvetica,sans-serif";
+ let s=`<svg xmlns="http://www.w3.org/2000/svg" width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}"><rect width="${VW}" height="${VH}" fill="#ffffff"/>`;
+ s+=`<text x="${VW/2}" y="${pad+lf}" text-anchor="middle" font-family="${F}" font-size="${lf}" fill="#5b6977">${T.top}</text><text x="${VW/2}" y="${VH-pad+4}" text-anchor="middle" font-family="${F}" font-size="${lf}" fill="#5b6977">${T.bot}</text>`;
+ (T.block||[]).forEach(([x,y,w,h])=>{s+=`<rect x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}" fill="#eceff2" stroke="#c9d1d9" stroke-width="2"/>`});
+ const rs=useApt(id);const has=k=>rs.find(r=>r.k===k);
+ const fill=k=>{const st=roomStat(a,k);return st.defs?"#fbe4e1":st.na?"#fff1d6":st.complete?"#dff1e6":"#ffffff"};
+ for(const k in T.rooms){if(!has(k))continue;T.rooms[k].r.forEach(([x,y,w,h])=>{s+=`<rect x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}" fill="${fill(k)}" stroke="#17202a" stroke-width="5"/>`})}
+ const ln=(c,w,da)=>([x1,y1,x2,y2])=>`<line x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}" stroke="${c}" stroke-width="${w}"${da?` stroke-dasharray="${da}"`:""}/>`;
+ for(const k in T.rooms){if(!has(k))continue;const R=T.rooms[k];s+=ln("#ffffff",10)(R.dr);if(R.open)s+=ln("#17202a",2,"7 7")(R.dr)}
+ (T.opn||[]).forEach(o=>{s+=ln("#ffffff",10)(o)+ln("#17202a",2,"7 7")(o)});
+ if(T.ent){const [x1,y1,x2]=T.ent;const mx=(X(x1)+X(x2))/2;s+=ln("#1f5fa8",10)(T.ent)+`<path d="M${mx-14} ${Y(y1)-28} L${mx+14} ${Y(y1)-28} L${mx} ${Y(y1)-9} Z" fill="#1f5fa8"/>`}
+ for(const k in T.rooms){if(!has(k))continue;const [x,y,w,h]=T.rooms[k].r[0];const st=roomStat(a,k);
+  const nm=(k==="bed1"&&!has("bed2"))?"Bedroom":({hall:"Hall",frd:"FRD",bath:"Bath",kitchen:"Kitchen",living:"Living",bed1:"Bed 1",bed2:"Bed 2"})[k];
+  const fs=Math.max(15,Math.min(M*sc*0.045,w*sc/(nm.length*0.62),h*sc*0.4));const sub=st.defs?`${st.defs} defect${st.defs>1?"s":""}`:st.na?`${st.na} N/A`:"";
+  s+=`<text x="${X(x+w/2)}" y="${Y(y+h/2)+(sub?-2:fs*0.35)}" text-anchor="middle" font-family="${F}" font-weight="bold" font-size="${fs.toFixed(0)}" fill="#17202a">${nm}</text>`;
+  if(sub)s+=`<text x="${X(x+w/2)}" y="${Y(y+h/2)+fs*0.95}" text-anchor="middle" font-family="${F}" font-size="${(fs*0.75).toFixed(0)}" fill="${st.defs?"#b42318":"#a86200"}">${sub}</text>`}
+ s+=`</svg>`;const img=new Image();img.onload=()=>{const c=document.createElement("canvas");c.width=VW;c.height=VH;c.getContext("2d").drawImage(img,0,0);res({url:c.toDataURL("image/png"),w:VW,h:VH})};img.onerror=()=>res(null);
+ img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s)})}
+
+const pdfTxt=s=>String(s==null?"":s).replace(/[–—]/g,"-").replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/→/g,"->").replace(/[✓✔]/g,"").replace(/⚑/g,"").replace(/…/g,"...").replace(/[^\x00-\xFF]/g,"").trim();
+function blobToDataURL(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(b)})}
+function imgSize(u){return new Promise(res=>{const im=new Image();im.onload=()=>res([im.naturalWidth,im.naturalHeight]);im.onerror=()=>res([4,3]);im.src=u})}
+
+async function buildPDF(id){const {jsPDF}=window.jspdf;const Pp=aptById(id);const a=A(id);const st=aptStat(a);const T=pdfTxt;
+ const doc=new jsPDF({unit:"mm",format:"a4"});const W=210,M=14;const defs=orderedDefs(a);const no={};defs.forEach((d,k)=>no[d.id]="D"+(k+1));
+ const head=(t)=>{doc.setFillColor(31,95,168);doc.rect(0,0,W,24,"F");doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(9);doc.text("HERAKLES JOINT INSPECTION - HUS B",M,9);
+  doc.setFontSize(15);doc.text(T(t),M,18);doc.setTextColor(23,32,42);doc.setFont("helvetica","normal")};
+ head(`LGH ${Pp.lgh} - modules ${Pp.mods}${a.rev?" - revision "+a.rev:""}`);
+ const sg=a.signs||{};const info=[["Project","Herakles, Gävle - HUS B, plan "+Pp.plan],["Apartment",`LGH ${Pp.lgh} · TYP ${Pp.typ} · ${Pp.rok} RoK · ${Pp.m2} m2 · modules ${Pp.mods}`],["Inspection","Joint visual inspection TLC + NT"],
+  ["Started",dtF(a.startedAt)],["Walk-through finished",dtF(a.endedAt)],["Signed",dtF(a.signedAt)+(a.rev?` (revision ${a.rev})`:"")],
+  ["Recorder",sg.rec?`${sg.rec.name} (${sg.rec.company})`:""],["Countersigned",sg.other?`${sg.other.name} (${sg.other.company})`:""],
+  ["Result",`${st.n} items: ${st.ok} OK · ${st.nok} NOT OK · ${st.na} N/A${st.r2?` (${st.r2} OK in 2nd round)`:""}`],["Defects",`${st.defs} recorded${st.flag?` · ${st.flag} not agreed`:""}`]];
+ if((a.history||[]).length>1)info.push(["Revisions",a.history.map(hh=>`rev ${hh.rev}: ${dtF(hh.signedAt)}`).join(" · ")]);
+ doc.autoTable({startY:30,body:info.map(r=>r.map(T)),theme:"plain",styles:{fontSize:9.5,cellPadding:1.2,textColor:[23,32,42]},columnStyles:{0:{fontStyle:"bold",cellWidth:40}},margin:{left:M,right:M}});
+ let y=doc.lastAutoTable.finalY+4;const pic=await sketchPNG(a,Pp.typ,id);
+ if(pic){let w=150,h=w*pic.h/pic.w;if(h>140){h=140;w=h*pic.w/pic.h}if(y+h>275){doc.addPage();y=16}doc.addImage(pic.url,"PNG",(W-w)/2,y,w,h);y+=h+3}
+ doc.setFontSize(8.5);doc.setTextColor(91,105,119);
+ doc.text(doc.splitTextToSize(T("Green = room OK · red = defects · orange = not able to inspect (N/A). Walls: standing in the doorway facing into the room, W1 is the wall on the left, then clockwise; W4 is the wall with the door. W1-W2 etc. = the corner between two walls. Plan drawn from the TLC module drawings."),W-2*M),M,y+2);doc.setTextColor(23,32,42);
+ /* checklist */
+ doc.addPage();head(`LGH ${Pp.lgh} - checklist`);y=30;
+ const dTxt=d=>`${no[d.id]} ${d.point&&d.point.toLowerCase()!==d.item.toLowerCase()?d.point+": ":""}${issueTxt(d)} (${d.sev})${d.rnd===2?" [2nd round]":""}${d.flag?" NOT AGREED":""}`;
+ ROOMS.forEach(R=>{const body=R.items.map(([el],i)=>{const ds=itemDefs(a,R.k,i);const key=R.k+":"+i;return [i+1,T(el),resultTxt(a,R.k,i),T(ds.map(dTxt).join("\n")),T(key in a.na?(a.na[key]||"not able to inspect"):"")]});
+  a.defects.filter(d=>d.room===R.k&&d.i===-1).forEach(d=>body.push(["+",T(d.item),"NOT OK",T(dTxt(d)),""]));
+  doc.autoTable({startY:y,head:[[{content:T(R.name),colSpan:5,styles:{fillColor:[226,236,248],textColor:[23,32,42],fontStyle:"bold",fontSize:10}}],["No.","Item","Result","Defects (see defect list)","N/A reason"]],body,
+   theme:"grid",styles:{fontSize:8,cellPadding:1.4,lineColor:[212,219,226],lineWidth:.2,textColor:[23,32,42]},headStyles:{fillColor:[242,244,246],textColor:[91,105,119],fontStyle:"bold"},
+   columnStyles:{0:{cellWidth:9},1:{cellWidth:46},2:{cellWidth:26,fontStyle:"bold"},3:{cellWidth:"auto"},4:{cellWidth:30}},margin:{left:M,right:M,top:28},
+   didParseCell:d=>{if(d.section==="body"&&d.column.index===2){const v=String(d.cell.raw);if(v.startsWith("NOT OK"))d.cell.styles.textColor=[180,35,24];else if(v.startsWith("OK"))d.cell.styles.textColor=[27,119,67];else if(v==="N/A")d.cell.styles.textColor=[168,98,0]}}});
+  y=doc.lastAutoTable.finalY+5});
+ /* defect list */
+ if(defs.length){doc.addPage();head(`LGH ${Pp.lgh} - defect list`);
+  doc.autoTable({startY:30,head:[["No.","Room","Item · point","Defect","Sev.","Trade","Note","Photo","Agreed"]],
+   body:defs.map(d=>[no[d.id],T(roomByK(d.room).name.replace(/ \(.*\)/,"")),T(d.item+(d.point&&d.point.toLowerCase()!==d.item.toLowerCase()?" · "+d.point:"")),T(issueTxt(d)),d.sev,T(d.trade),T(d.issue==="Other"?"":d.note||""),(d.photos||[]).length||"",(d.flag?"NOT AGREED":"")+(d.rnd===2?(d.flag?" · ":"")+"2nd round":"")]),
+   theme:"grid",styles:{fontSize:7.8,cellPadding:1.3,lineColor:[212,219,226],lineWidth:.2,textColor:[23,32,42]},headStyles:{fillColor:[242,244,246],textColor:[91,105,119],fontStyle:"bold"},
+   columnStyles:{0:{cellWidth:10,fontStyle:"bold"},1:{cellWidth:20},2:{cellWidth:36},3:{cellWidth:32},4:{cellWidth:14},5:{cellWidth:20},6:{cellWidth:"auto"},7:{cellWidth:11},8:{cellWidth:17}},margin:{left:M,right:M,top:28},
+   didParseCell:d=>{if(d.section==="body"&&d.column.index===8&&String(d.cell.raw).includes("NOT AGREED"))d.cell.styles.textColor=[168,98,0]}})}
+ /* not inspected */
+ const naKeys=Object.keys(a.na);if(naKeys.length){let yy=defs.length?doc.lastAutoTable.finalY+8:30;if(!defs.length){doc.addPage();head(`LGH ${Pp.lgh} - not able to inspect`)}if(yy>250){doc.addPage();head(`LGH ${Pp.lgh} - not able to inspect`);yy=30}
+  doc.setFont("helvetica","bold");doc.setFontSize(11);doc.text("Not able to inspect (N/A) and 2nd round",M,yy);doc.setFont("helvetica","normal");
+  doc.autoTable({startY:yy+3,head:[["Room","Item","Reason","2nd round"]],body:naKeys.map(key=>{const [k,i]=key.split(":");const R=roomByK(k);const s=itemState(a,k,+i);return [T(R.name.replace(/ \(.*\)/,"")),T(R.items[+i][0]),T(a.na[key]||"not able to inspect"),s==="na"?"still to inspect":T(resultTxt(a,k,+i))]}),
+   theme:"grid",styles:{fontSize:8,cellPadding:1.4,lineColor:[212,219,226],lineWidth:.2,textColor:[23,32,42]},headStyles:{fillColor:[242,244,246],textColor:[91,105,119],fontStyle:"bold"},margin:{left:M,right:M,top:28}})}
+ /* photos – a photo shared by several defects is printed once */
+ const phs=[];const seen={};defs.forEach(d=>(d.photos||[]).forEach(p=>{if(seen[p]){seen[p].cap=seen[p].cap.replace(/^(D\d+(?:, D\d+)*)/,"$1, "+no[d.id]);return}const o={p,cap:`${no[d.id]} · ${roomByK(d.room).name.replace(/ \(.*\)/,"")} · ${d.item}${d.point&&d.point.toLowerCase()!==d.item.toLowerCase()?" · "+d.point:""} · ${issueTxt(d)}`};seen[p]=o;phs.push(o)}));
+ if(phs.length){doc.addPage();head(`LGH ${Pp.lgh} - photos`);let x=M,py=30,rowH=0;const cw=(W-2*M-6)/2;
+  for(const ph of phs){const b=mem.photos[ph.p];if(!b)continue;let du;try{du=await blobToDataURL(b)}catch(e){continue}const [iw,ih]=await imgSize(du);let w=cw,h=cw*ih/iw;if(h>100){h=100;w=h*iw/ih}
+   if(py+h+10>285){doc.addPage();head(`LGH ${Pp.lgh} - photos`);py=30;x=M;rowH=0}
+   try{doc.addImage(du,du.startsWith("data:image/png")?"PNG":"JPEG",x,py,w,h)}catch(e){}doc.setFontSize(7.5);doc.text(doc.splitTextToSize(T(ph.cap),cw),x,py+h+3.5);rowH=Math.max(rowH,h+11);
+   if(x===M)x=M+cw+6;else{x=M;py+=rowH;rowH=0}}}
+ /* signatures */
+ doc.addPage();head(`LGH ${Pp.lgh} - signatures`);doc.setFontSize(9.5);
+ doc.text(doc.splitTextToSize(T(`The undersigned confirm that the visual inspection of LGH ${Pp.lgh} (modules ${Pp.mods}) was carried out jointly and that the results in this report are complete${a.rev?", including the 2nd-round inspection of the items that could not be inspected before":""}. Points marked NOT AGREED are recorded as disputed by the other company.`),W-2*M),M,34);
+ [["Recorder",sg.rec],["Countersigned",sg.other]].forEach(([t,s],k)=>{if(!s)return;const x=M+k*92,yy=52;doc.setFont("helvetica","bold");doc.text(t,x,yy);doc.setFont("helvetica","normal");
+  doc.text(T(`${s.name} (${s.company})`),x,yy+6);doc.text(T(dtF(s.at)),x,yy+11);doc.setDrawColor(212,219,226);doc.rect(x,yy+14,84,30);try{doc.addImage(s.sig,"PNG",x+1,yy+15,82,28)}catch(e){}});
+ if((a.history||[]).length>1){doc.setFontSize(8.5);doc.setTextColor(91,105,119);doc.text(T("Earlier signatures: "+a.history.slice(0,-1).map(hh=>`rev ${hh.rev} ${dtF(hh.signedAt)} – ${hh.rec.name} (${hh.rec.company}) / ${hh.other.name} (${hh.other.company})`).join("; ")),M,104,{maxWidth:W-2*M});doc.setTextColor(23,32,42)}
+ const n=doc.getNumberOfPages();for(let p=1;p<=n;p++){doc.setPage(p);doc.setFontSize(7.5);doc.setTextColor(91,105,119);doc.text(T(`LGH ${Pp.lgh} · modules ${Pp.mods}${a.rev?" · rev "+a.rev:""} · page ${p} of ${n}`),M,292);doc.text("HERAKLES JOINT INSPECTION APP",W-M,292,{align:"right"})}
+ return doc.output("blob")}
+
+/* one flat table per apartment – every checklist point and every defect (for collecting all reports) */
+function aptRows(Pp){useApt(Pp.id);const a=S().apts[Pp.id];if(!a)return [];const defs=orderedDefs(a);const no={};defs.forEach((d,k)=>no[d.id]="D"+(k+1));const out=[];
+ const base={"LGH":Pp.lgh,"Modules":Pp.mods,"Plan":Pp.plan,"Type":Pp.typ,"Started":dtF(a.startedAt),"Signed":dtF(a.signedAt),"Revision":a.signedAt?(a.rev||0):""};
+ const drow=(R,d,res)=>Object.assign({},base,{"Room":R.name,"Item":d.item,"Point":d.point,"Wall":d.wall||"","Result":res,"Defect no.":no[d.id],"Defect":issueTxt(d),"Category":d.cat,"Severity":d.sev,"Trade":d.trade,"Not agreed":d.flag?"YES":"","Note":d.issue==="Other"?"":(d.note||""),"Photos":(d.photos||[]).length||"","Round":d.rnd===2?"2nd":"1st","N/A reason":"","Recorded by":d.by||"","Time":dtF(d.at)});
+ ROOMS.forEach(R=>{R.items.forEach(([name,pts],i)=>{const res=resultTxt(a,R.k,i);const key=R.k+":"+i;
+  pts.forEach((p,j)=>{const ds=a.defects.filter(d=>d.room===R.k&&d.i===i&&d.j===j);
+   if(ds.length)ds.forEach(d=>out.push(drow(R,d,res)));
+   else out.push(Object.assign({},base,{"Room":R.name,"Item":name,"Point":p,"Wall":wallOf(p)||"","Result":res.startsWith("NOT OK")?"OK":res,"Defect no.":"","Defect":"","Category":"","Severity":"","Trade":"","Not agreed":"","Note":"","Photos":"","Round":"","N/A reason":key in a.na?(a.na[key]||"not able to inspect"):"","Recorded by":"","Time":""}))});
+  a.defects.filter(d=>d.room===R.k&&d.i===i&&d.j===-1).forEach(d=>out.push(drow(R,d,res)))});
+  a.defects.filter(d=>d.room===R.k&&d.i===-1).forEach(d=>out.push(drow(R,d,"NOT OK (other item)")))});
+ return out}
+function toCSV(rows){if(!rows.length)return "";const cols=Object.keys(rows[0]);const q=v=>{const s=String(v==null?"":v);return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+ return "﻿"+[cols.join(";")].concat(rows.map(r=>cols.map(c=>q(r[c])).join(";"))).join("\r\n")}
+const fileBase=(Pp,a)=>`Herakles HUS B LGH ${Pp.lgh} mod ${Pp.mods.replace(/ \((west|east) half\)/,(m0,x)=>x[0].toUpperCase())} ${new Date(a.signedAt||Date.now()).toISOString().slice(0,10)}${a.rev?" rev"+a.rev:""}`;
+function saveBlob(b,name){const u=URL.createObjectURL(b);const l=document.createElement("a");l.href=u;l.download=name;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),10000)}
+let sharing=false;
+async function shareReport(id){if(sharing)return;const Pp=aptById(id);const a=A(id);if(!window.jspdf){toast("The report tool did not load – open the app once with internet");return}
+ sharing=true;toast("Preparing the report…");let pdf,csv;
+ try{pdf=await buildPDF(id);csv=new Blob([toCSV(aptRows(Pp))],{type:"text/csv"})}catch(e){console.error(e);toast("The report could not be made");sharing=false;return}
+ const base=fileBase(Pp,a);const f1=new File([pdf],base+".pdf",{type:"application/pdf"}),f2=new File([csv],base+".csv",{type:"text/csv"});
+ const done=()=>{a.sentAt=Date.now();saveState();sharing=false;render()};
+ try{if(navigator.canShare&&navigator.canShare({files:[f1,f2]})){await navigator.share({files:[f1,f2],title:base,text:`Joint inspection report LGH ${Pp.lgh} (modules ${Pp.mods}), HUS B Herakles${a.rev?" – revision "+a.rev:""}.\nPDF = signed report, CSV = all points and defects (opens in Excel).`});done();return}
+  if(navigator.canShare&&navigator.canShare({files:[f1]})){await navigator.share({files:[f1],title:base,text:`Joint inspection report LGH ${Pp.lgh}, HUS B Herakles`});saveBlob(csv,f2.name);done();return}}
+ catch(e){if(e&&e.name==="AbortError"){sharing=false;return}}
+ saveBlob(pdf,f1.name);setTimeout(()=>saveBlob(csv,f2.name),700);toast("Report saved to Downloads – send it from there");done()}
+
+/* ===== router ===== */
+function render(){const y=window.scrollY;route();window.scrollTo(0,y)}
+function route(){if(!$sheet.hidden&&C)return;const h=location.hash.slice(1);let m;
+ if(!S().me||h==="me"){viewSetup();return}
+ if((m=h.match(/^r-(\d{4}-\d{4}[we]?)-([a-z0-9]+)$/))&&aptById(m[1])&&(useApt(m[1]),roomByK(m[2]))){viewRoom(m[1],m[2]);return}
+ if((m=h.match(/^a-(\d{4}-\d{4}[we]?)$/))&&aptById(m[1])){viewApt(m[1]);return}
+ if((m=h.match(/^n-(\d{4}-\d{4}[we]?)$/))&&aptById(m[1])){viewRound2(m[1]);return}
+ if((m=h.match(/^s-(\d{4}-\d{4}[we]?)$/))&&aptById(m[1])){viewSign(m[1]);return}
+ if(h==="sum"){viewSum();return}
+ viewHome()}
+window.addEventListener("hashchange",()=>{if(!$sheet.hidden){$sheet.hidden=true;$sheet.innerHTML="";C=null}route();window.scrollTo(0,0)});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&curApt)reqWake()});
+(async function boot(){await openDB();const kv=await getAll("kv");mem.state=kv.state||{me:null,apts:{}};
+ const ph=await getAll("photos");Object.assign(mem.photos,ph);
+ try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+ if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});
+ route()})();
+})();
+</script>
+</body>
+</html>
