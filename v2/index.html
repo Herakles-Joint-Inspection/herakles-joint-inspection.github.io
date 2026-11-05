@@ -512,7 +512,7 @@ function viewRoom(id,k){const Pp=aptById(id);const a=A(id);const R=roomByK(k);if
   h+=ds.length?`<span class="nokb">NOT OK${ds.length>1?" ×"+ds.length:""}</span>`:`<button class="nab" data-na="${i}" aria-pressed="${s==="na"}">N/A</button><button class="okb" data-ok="${i}" aria-pressed="${s==="ok"}">${s==="ok"?"OK ✓":"OK"}</button>`;
   h+=`</div>`;
   if(s==="na")h+=`<div class="naw"><span class="lab">Reason (optional)</span><div class="chips">${NA_WHY.map(w=>`<button class="chip nac" data-why="${i}|${esc(w)}" aria-pressed="${a.na[k+":"+i]===w}">${esc(w)}</button>`).join("")}</div></div>`;
-  if(open){h+=`<div class="pts"><p class="hint">Tap the point that is not OK – the camera opens. All other points stay OK.</p>${pts.map((p,j)=>{const n=ds.filter(d=>d.j===j);/*per point*/
+  if(open){h+=`<div class="pts"><p class="hint">Tap the point that is not OK and choose what is wrong – photo only if you want one. All other points stay OK.</p>${pts.map((p,j)=>{const n=ds.filter(d=>d.j===j);/*per point*/
     return `<button class="pt${n.length?" bad":""}" data-pt="${i}:${j}"><span>${esc(p)}</span><span class="stt">${n.length?"NOT OK"+(n.length>1?" ×"+n.length:""):"OK"}</span></button>`}).join("")}
     <button class="pt add" data-ptother="${i}"><span>+ Other point (not in the list)</span></button>
     ${ds.length?`<div class="ddl">${ds.map(defRow).join("")}</div>`:""}</div>`}
@@ -556,9 +556,8 @@ $app.addEventListener("keydown",e=>{const p=e.target.closest&&e.target.closest("
 const $sheet=document.getElementById("sheet");const cam=document.getElementById("cam");
 let C=null; /* the defect(s) being recorded */
 function openCapture(apt,room,i,j,rnd){const a=A(apt);touch(a);const it=i>=0?roomByK(room).items[i]:["",[]];const item=it[0],pts=it[1];
- C={apt,room,i,j,rnd:rnd||1,item,point:j>=0?pts[j]:"",customItem:i<0,customPoint:j<0,editId:null,orig:[],photos:[],ps:"wait",issues:[],sev:null,sevTouched:false,flag:false,note:""};
- renderSheet();$sheet.hidden=false;try{cam.value=""}catch(e){}
- cam.click()} /* camera opens in the same tap */
+ C={apt,room,i,j,rnd:rnd||1,item,point:j>=0?pts[j]:"",customItem:i<0,customPoint:j<0,editId:null,orig:[],photos:[],ps:"none",issues:[],sev:null,sevTouched:false,flag:false,note:""};
+ renderSheet();$sheet.hidden=false} /* record the defect first; the camera opens only when "Take photo" is tapped */
 function openEdit(apt,d){const ph=d.photos?d.photos.slice():(d.photo?[d.photo]:[]);
  C={apt,room:d.room,i:d.i,j:d.j,rnd:d.rnd||1,item:d.item,point:d.point,customItem:d.i<0,customPoint:d.j<0,editId:d.id,orig:ph.slice(),photos:ph,ps:"ok",issues:[d.issue],sev:d.sev,sevTouched:true,flag:d.flag,note:d.note||""};renderSheet();$sheet.hidden=false}
 function closeSheet(){$sheet.hidden=true;$sheet.innerHTML="";C=null;render()}
@@ -575,17 +574,17 @@ async function shrink(file){const MAX=1600;
   const k=Math.min(1,MAX/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
   return await new Promise(r=>c.toBlob(b=>r(b||file),"image/jpeg",0.78))}catch(e){return file}finally{URL.revokeObjectURL(url)}}
 function photoHTML(){const n=C.photos.length;
- const st=C.ps==="saving"?`<span class="st-wait">Saving photo…</span>`:C.ps==="mem"?`<span class="st-wait">Photo kept – phone storage unavailable</span>`:n?`<span class="st-ok">${n} photo${n>1?"s":""} saved ✓</span>`:`<span class="st-wait">${C.ps==="wait"?"Take the photo…":"No photo"}</span>`;
+ const st=C.ps==="saving"?`<span class="st-wait">Saving photo…</span>`:C.ps==="mem"?`<span class="st-wait">Photo kept – phone storage unavailable</span>`:n?`<span class="st-ok">${n} photo${n>1?"s":""} saved ✓</span>`:`<span class="muted">No photo – optional</span>`;
  return `<div class="phstrip">${C.photos.map(id=>`<span class="phw"><img class="th" src="${photoURL(id)}" alt="Defect photo"><button class="phx" data-rmph="${id}" aria-label="Remove photo">×</button></span>`).join("")}<button class="addph2" data-x="addph">＋<small>${n?"Add photo":"Take photo"}</small></button></div><span class="st">${st}</span>`}
 function renderPhoto(){const b=document.getElementById("phbox");if(b)b.innerHTML=photoHTML()}
 function renderSheet(){const R=roomByK(C.room);const iss=C.customPoint?issuesFor("~"):issuesFor(C.point,C.item);const multi=!C.editId;const n=C.issues.length;
  const title=C.customItem?(C.item||"Other item"):C.item+(C.customPoint?" · "+(C.point||"other point"):C.point.toLowerCase()!==C.item.toLowerCase()?" · "+C.point:"");
  $sheet.innerHTML=`<div class="sh-head"><div class="in"><button class="back" data-x="cancel" aria-label="Cancel">✕</button><div class="ttl"><span class="app">${C.editId?"EDIT":"NOT OK"}${C.rnd===2?" · 2ND ROUND":""} · ${esc(R.name.toUpperCase())}</span><b>${esc(title)}</b></div></div></div>
  <div class="sh-scroll"><div class="sh-body">
-  <div class="phbox" id="phbox">${photoHTML()}</div>
   ${C.customItem?`<div class="field" style="margin:0"><label for="citem">Item – what is it?</label><input type="text" id="citem" value="${esc(C.item)}" placeholder="e.g. Socket, Light switch, Smoke detector"></div>`:""}
   ${C.customPoint?`<div class="field" style="margin:0"><label for="cpoint">${C.customItem?"Where / which part (optional)":"Point – which part?"}</label><input type="text" id="cpoint" value="${esc(C.point)}" placeholder="e.g. hinge, lock, cover plate"></div>`:""}
   <div class="grp"><span class="lab">What is wrong?${multi?" Tick all that apply":""}</span><div class="chips">${iss.map(x=>`<button class="chip" data-iss="${esc(x)}" aria-pressed="${C.issues.includes(x)}">${esc(x)}</button>`).join("")}</div></div>
+  <div class="grp"><span class="lab">Photo (optional)</span><div class="phbox" id="phbox">${photoHTML()}</div></div>
   ${n?`<div class="grp"><span class="lab">Severity${n>1?" (for all ticked)":""}</span><div class="seg3">${SEV.map(s=>`<button data-sev="${s}" aria-pressed="${C.sevTouched?C.sev===s:(n===1&&defaultSev(C.issues[0])===s)}">${s}</button>`).join("")}</div></div>
   <button class="flag" data-x="flag" aria-pressed="${C.flag}">⚑ Not agreed by the other company</button>
   <div class="field" style="margin:0"><label for="dnote">${C.issues.includes("Other")?"Describe the defect":"Note (optional)"} – use the mic on your keyboard to speak</label><input type="text" id="dnote" value="${esc(C.note)}" placeholder="e.g. 30 cm above the socket"></div>`:""}
