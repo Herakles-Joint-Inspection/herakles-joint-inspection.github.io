@@ -276,8 +276,7 @@ const ROOMS3=[
  {k:"bed2",name:"Bedroom 2",items:[["Bedroom 2 door",DOOR],["Window",WIN],["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD],["Furniture",["furniture"]]]}];
 const FRENCH=P("opening / closing · handle · glass · frame & gasket · railing");
 const RCACHE={};
-/* checklist v1 = the first version (kept for apartments started with it, so their records and reports stay correct) */
-function roomsOfV1(ap){const key="v1|"+ap.lay+"|"+ap.bal;if(RCACHE[key])return RCACHE[key];
+function roomsOf(id){const ap=APTS.find(x=>x.id===id);if(!ap)return ROOMS3;const key=ap.lay+"|"+ap.bal;if(RCACHE[key])return RCACHE[key];
  const cp=r=>({k:r.k,name:r.name,items:r.items.map(it=>[it[0],it[1]])});let rs=ROOMS3.map(cp);
  const liv=rs.find(r=>r.k==="living");const bi=liv.items.findIndex(it=>it[0]==="Balcony door");
  if(ap.bal==="french")liv.items[bi]=["French balcony door",FRENCH];else if(ap.bal==="none")liv.items.splice(bi,1);
@@ -285,46 +284,6 @@ function roomsOfV1(ap){const key="v1|"+ap.lay+"|"+ap.bal;if(RCACHE[key])return R
  if(ap.lay==="2R"){const b=rs.find(r=>r.k==="bed1");b.name="Bedroom";b.items[0][0]="Bedroom door"}
  if(ap.lay==="1R")rs=rs.filter(r=>r.k!=="bed1");
  RCACHE[key]=rs;return rs}
-/* checklist v2 – made for each apartment type from the TLC module drawings (Dalux Prototype/TYP xx) */
-const LOWC=P("boards / paint · joint to wall · access hatch (filters)"),
- WARD=P("doors · hinges / adjustment · gaps · shelves / rail · screw covers · clean"),
- SLIDE=P("sliding / closing · doors aligned · track / guide · leaf · trim / list"),
- SHAFT=P("closed / boxed in · fire seal · water damage"),
- JOINT=P("floor joint · wall joint · ceiling joint");
-/* frd: where the storage is opened from and the door kind · ward: wardrobes per room · shaft: room where the pipe shaft is reached ·
-   joint: rooms the module joint runs through · kwin: kitchen has a window */
-const TSPEC={
- "4":{frd:{from:"bed1",door:"sliding"},ward:{hall:"Wardrobe"},shaft:"kitchen",joint:["kitchen","living","frd"]},
- "5":{frd:{from:"hall",door:"hinged",site:1},ward:{hall:"Wardrobe"},shaft:"frd",kwin:1,joint:["hall","frd","kitchen","living"]},
- "6":{frd:{from:"hall",door:"sliding"},ward:{hall:"Wardrobe",bed1:"Wardrobe & cleaning cupboard"},shaft:"frd",joint:["hall","frd","kitchen","living","bed1"]},
- "7":{frd:{from:"bed1",door:"sliding"},ward:{},shaft:"living",joint:["living","bed1"]},
- "13":{frd:{from:"bed1",door:"sliding"},ward:{hall:"Wardrobe",living:"Wardrobe"},shaft:"frd",joint:["hall","frd","kitchen","living"]},
- "14":{frd:{from:"hall",door:"sliding"},ward:{hall:"Wardrobe",bed1:"Wardrobes",bed2:"Wardrobe"},shaft:"frd",joint:["hall","frd","living","bed1","bed2"]},
- "32":{frd:{from:"bed1",door:"sliding"},ward:{hall:"Wardrobe",bed2:"Wardrobes & cleaning cupboard"},shaft:"frd",joint:["hall","frd","kitchen","living"]},
- "33":{frd:{from:"bed1",door:"sliding"},ward:{hall:"Wardrobe"},shaft:"living",joint:[]},
- "34":{frd:{from:"hall",door:"hinged"},ward:{hall:"Wardrobe & cleaning cupboard",bed1:"Sliding wardrobe"},shaft:"living",joint:["frd","living","bed1"]},
- "36":{frd:{from:"hall",door:"sliding"},ward:{},shaft:"bed1",joint:["hall","frd","living","bed1"]},
- "37":{frd:null,ward:{hall:"Wardrobe",living:"Wardrobe"},shaft:"kitchen",kwin:1,joint:["kitchen","living"]},
- "42":{frd:{from:"hall",door:"sliding",site:1},ward:{},shaft:"frd",joint:[]},
- "12":{frd:{from:"hall",door:"sliding",site:1},ward:{hall:"Wardrobe"},shaft:"frd",joint:[]}};
-const baseTyp=t=>({"3":"4","7A":"7","7B":"7","14A":"14","14B":"14"})[t]||t;
-function roomsOfV2(ap){const bt=baseTyp(ap.typ);const key="v2|"+bt+"|"+ap.lay+"|"+ap.bal;if(RCACHE[key])return RCACHE[key];
- const sp=TSPEC[bt]||TSPEC["4"];const W=sp.ward||{};const wi=(k)=>W[k]?[[W[k],/sliding/i.test(W[k])?SLIDE:WARD]]:[];
- const sh=k=>sp.shaft===k?[["Pipe shaft",SHAFT]]:[];const jn=k=>(sp.joint||[]).includes(k)?[["Module joint",JOINT]]:[];
- const balIt=ap.bal==="french"?[["French balcony door",FRENCH]]:ap.bal==="balcony"?[["Balcony door",BAL]]:[];
- const R={};
- R.hall={k:"hall",name:"Entrance / Hall",items:[["Entrance door",P("closing · leaf · frame · frame cover · frame cover 45° joint · gasket · wooden threshold list · silicone")],["Wood floor",P("connection at entrance door · movement / squeak")],["Skirting",SKIRT],["Clothes hanger / hat shelf",P("fixed · clean")],...wi("hall"),["Walls",WALLS],["Ceiling",CEIL],["Lowered ceiling (ventilation filters)",LOWC],["Distribution board (DB box)",P("flush with wall · cover / door")],["Bathroom door (hall side)",DOOR],...sh("hall"),...jn("hall")]};
- if(sp.frd)R.frd={k:"frd",name:sp.frd.site?"FRD (built on site)":"FRD (storage)",items:[[sp.frd.door==="hinged"?"FRD door":"FRD sliding doors",sp.frd.door==="hinged"?DOOR:SLIDE],["Skirting",SKIRT],["Floor",FLOOR],["Walls (painting)",WALLS],["Ceiling",CEIL],["Storage rack / shelves",P("fixed · complete · undamaged")],...sh("frd"),["Fire seal around conduits",["fire seal"]],...jn("frd")]};
- R.bath={k:"bath",name:"Bathroom",items:[["Bathroom door",BDOOR],["Threshold",P("side gaps · silicone · crack · movement / squeak")],["Floor tiles",P("tiles · grout")],["Wall tiles",WALLS],["Ceiling & LK box",P("ceiling · LK box · around LK box / ventilation opening")],["Sink",P("fixing · silicone")],["Tap",P("installed · moving / tightened")],["Mirror",["mirror"]],["Shower",P("head support · head installed · tap fixing · tap dirty")],["Shower glass",["shower glass"]],["Towel dryer",P("fixed · level · clean")],["Toilet",["seat & basin"]],...sh("bath")]};
- R.kitchen={k:"kitchen",name:"Kitchen",items:[...(sp.kwin?[["Window",WIN]]:[]),["Skirting",SKIRT],["Floor",FLOOR],["Control panel in the cabinet",["control panel"]],["Kitchen top",P("scratches · cracks · silicone")],["Backsplash",P("connection · scratches · cracks · silicone · silicone wall to furniture (L/R)")],["Furniture",P("adjustment / level · gaps · screw covers · doors & drawers · shelves · cover board at fridge · clean")],["Tap & sink",P("tap installed · tap moving / tightened · tap lock · sink fixing · silicone at sink")],["Dishwasher hole",["dishwasher hole"]],["Walls",WALLS],["Ceiling",CEIL],...sh("kitchen"),...jn("kitchen")]};
- R.living={k:"living",name:"Living room",items:[["Window",WIN],...balIt,["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD],...wi("living"),...sh("living"),...jn("living")]};
- const bed=(k,nm,dn)=>({k,name:nm,items:[[dn,DOOR],["Window",WIN],["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD],...wi(k),...sh(k),...jn(k)]});
- if(ap.lay==="3R"){R.bed1=bed("bed1","Bedroom 1","Bedroom 1 door");R.bed2=bed("bed2","Bedroom 2","Bedroom 2 door")}else if(ap.lay==="2R")R.bed1=bed("bed1","Bedroom","Bedroom door");
- const fh=sp.frd&&sp.frd.from==="hall";const order=["hall","bath",fh?"frd":"","kitchen","living","bed1",fh?"":"frd","bed2"];
- const rs=order.filter(k=>k&&R[k]).map(k=>R[k]);RCACHE[key]=rs;return rs}
-/* which checklist an apartment uses: v1 if it was started before v2 existed, otherwise v2 */
-function clvOf(id){const st=S();const a=st&&st.apts&&st.apts[id];return a&&a.clv?a.clv:(a&&(a.startedAt||a.signedAt||a.defects&&a.defects.length||Object.keys(a.ok||{}).length||Object.keys(a.na||{}).length)?1:2)}
-function roomsOf(id){const ap=APTS.find(x=>x.id===id);if(!ap)return ROOMS3;return clvOf(id)===1?roomsOfV1(ap):roomsOfV2(ap)}
 let ROOMS=ROOMS3;function useApt(id){ROOMS=roomsOf(id);return ROOMS}
 const RNAME={hall:"Entrance / Hall",frd:"FRD (storage)",bath:"Bathroom",kitchen:"Kitchen",living:"Living room",bed1:"Bedroom 1",bed2:"Bedroom 2"};
 const ALLR=["hall","frd","bath","kitchen","living","bed1","bed2"];
@@ -337,28 +296,17 @@ const WB={living:[[450,1035],[360,700],[505,338],[650,600]],kitchen:[[450,1035],
  bed1:[[960,420],[1100,338],[1242,500],[1170,680]],frd:[[712,800],[752,765],[893,795],[820,828]],hall:[[950,905],[1045,730],[1045,1000],[970,1035]],bath:[[1170,822],[1242,930],[1170,1035],[1098,930]]};
 
 /* ===== what can be wrong with each point (draft – to agree) ===== */
-const WALLISS=["Crack in corner","Crack at ceiling joint","Crack above door","Crack around / under window","Diagonal crack","Straight crack","Large crack","Gap above window","Missing gypsum","Visible screws","Not straight / uneven","Water damage","Paint spots","Patchy paint","Dent / damage","Dirty"];
-const CEILISS=["Crack","Crack at wall joint","Crack around opening","Visible screws","Curved / sagging","Water damage","Patchy paint","Paint spots","Dirty"];
+const WALLISS=["Crack in corner","Crack at ceiling joint","Crack above door","Crack around / under window","Diagonal crack","Straight crack","Large crack","Gap above window","Missing gypsum","Visible screws","Water damage","Paint spots","Patchy paint","Dent / damage","Dirty"];
+const CEILISS=["Crack","Crack at wall joint","Crack around opening","Visible screws","Water damage","Patchy paint","Paint spots","Dirty"];
 const DOORISS=["Scratch","Dent / damage","Paint damage","Repair visible","Gap","Loose","Dirty"];
 const ISS=[
- [/access hatch/,["Missing","Not closing","Damaged","Gap"]],
- [/^boards \/ paint$/,["Crack","Visible screws","Paint","Damaged","Curved / sagging"]],
- [/^joint to wall$/,["Crack","Gap"]],
- [/^(floor|wall|ceiling) joint$/,["Water damage","Plywood / board to replace","Gap","Crack","Not aligned"]],
- [/^tap lock$/,["Not working","Missing","Loose"]],
- [/^shelves/,["Not straight","Loose","Missing","Damaged"]],
- [/cover board/,["Too short","Gap","Missing","Damaged"]],
- [/^doors$/,["Not closing","Needs adjustment","Damaged","Scratch","Missing"]],
- [/doors aligned/,["Not aligned","Gap"]],
- [/track/,["Loose","Damaged","Missing","Not working"]],
- [/closed \/ boxed/,["Not closed","Open hole","Loose","Damaged"]],
  [/^w\d-w\d$/,["Crack in corner"].concat(WALLISS.filter(x=>x!=="Crack in corner"))],
  [/^w\d$/,WALLISS],
  [/^ceiling$|around .*opening/,CEILISS],
  [/45°/,["Gap","Crack","Not aligned","Paint"]],
  [/opening|closing/,["Not closing","Hard to open","Rubbing","Needs adjustment"]],
  [/protection tape/,["Tape not removed"]],
- [/window list/,["Gap between window and list","Nails too deep / visible","Damaged","Paint"]],
+ [/window list/,["Gap between window and list","Damaged","Paint"]],
  [/^glass|shower glass/,["Scratch","Crack","Missing glass","Dirty"]],
  [/mirror/,["Scratch","Crack","Dirty","Missing"]],
  [/dirty|^clean$/,["Dirty"]],
@@ -388,9 +336,9 @@ const ISS=[
  [/frame|leaf|cover/,DOORISS],
  [/threshold|list|sill|floor|furniture|cabinet|hole|undamaged/,["Scratch","Dent / damage","Gap","Crack","Paint","Loose"]]];
 const TILEISS=["Cracked tile","Crack in corner","Gap / silicone in corner","Grout colour uneven","Chipped tile","Uneven tiles","Dirty"];
-const issuesFor=(pt,item)=>{if(/wall tiles/i.test(item||"")&&/^W\d/.test(pt))return TILEISS.concat(["Other"]);if(/clothes hanger/i.test(item||"")&&pt==="fixed")return ["Loose","Missing","Damaged","Plastic not removed","Other"];const p=pt.toLowerCase();const m=ISS.find(r=>r[0].test(p));return (m?m[1]:["Damaged","Scratch","Missing","Loose","Dirty","Not working"]).concat(["Other"])};
+const issuesFor=(pt,item)=>{if(/wall tiles/i.test(item||"")&&/^W\d/.test(pt))return TILEISS.concat(["Other"]);const p=pt.toLowerCase();const m=ISS.find(r=>r[0].test(p));return (m?m[1]:["Damaged","Scratch","Missing","Loose","Dirty","Not working"]).concat(["Other"])};
 function catOf(i){const s=i.toLowerCase();
- if(/screw cover/.test(s))return "Finish";if(/screw/.test(s))return "Visible screws";if(/grout|tile/.test(s))return "Tiles";if(/tape|different colour|wrong colour|yellow|too much silicone|filler|nails/.test(s))return "Finish";if(/flush|grill gap|not level|not even/.test(s))return "Gap / fit";if(/curved|sagging|not straight/.test(s))return "Not straight";if(/plastic not removed/.test(s))return "Finish";if(/plywood|board to replace/.test(s))return "Water";if(/gypsum/.test(s))return "Damaged";if(/crack/.test(s))return "Crack";if(/paint/.test(s))return "Paint";if(/scratch/.test(s))return "Scratch";if(/gap|not sealed|too short|uneven/.test(s))return "Gap / fit";
+ if(/screw cover/.test(s))return "Finish";if(/screw/.test(s))return "Visible screws";if(/grout|tile/.test(s))return "Tiles";if(/tape|different colour|wrong colour|yellow|too much silicone|filler|nails/.test(s))return "Finish";if(/flush|grill gap|not level|not even/.test(s))return "Gap / fit";if(/gypsum/.test(s))return "Damaged";if(/crack/.test(s))return "Crack";if(/paint/.test(s))return "Paint";if(/scratch/.test(s))return "Scratch";if(/gap|not sealed|too short|uneven/.test(s))return "Gap / fit";
  if(/dent|damaged/.test(s))return "Damaged";if(/missing/.test(s))return "Missing";if(/loose|moves/.test(s))return "Loose";
  if(/closing|hard to open|rubbing|adjust|not working|not aligned/.test(s))return "Function";if(/dirty/.test(s))return "Dirty";if(/water|swelling/.test(s))return "Water";if(/squeak/.test(s))return "Loose";return "Other"}
 const SEV=["Cosmetic","Repair","Replace"];
@@ -426,7 +374,7 @@ const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;"
 function toast(t){document.querySelectorAll(".toast").forEach(x=>x.remove());const d=document.createElement("div");d.className="toast";d.setAttribute("role","status");d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)}
 const aptById=id=>APTS.find(a=>a.id===id);const roomByK=k=>ROOMS.find(r=>r.k===k)||ROOMS3.find(r=>r.k===k);
 const newId=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-function A(id){const st=S();if(st.apts[id]&&!st.apts[id].clv)st.apts[id].clv=clvOf(id);if(!st.apts[id])st.apts[id]={clv:2,startedAt:null,endedAt:null,ok:{},na:{},r2ok:{},defects:[]};useApt(id);const a=st.apts[id];if(!a.na)a.na={};if(!a.r2ok)a.r2ok={};return a}
+function A(id){useApt(id);const st=S();if(!st.apts[id])st.apts[id]={startedAt:null,endedAt:null,ok:{},na:{},r2ok:{},defects:[]};const a=st.apts[id];if(!a.na)a.na={};if(!a.r2ok)a.r2ok={};return a}
 const fmt=ms=>{const s=Math.max(0,Math.round(ms/1000));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
 const elapsed=a=>a.startedAt?((a.endedAt||Date.now())-a.startedAt):0;
 const TARGET=10*60*1000; /* one apartment = two modules */
@@ -474,7 +422,6 @@ function sketchSVG(a,typ,sel){const T=SK[typ];if(!T)return "";const M=Math.max(T
  s+=`<text x="${VW/2}" y="${pad+lf}" text-anchor="middle" class="l2" style="font-size:${lf}px">${T.top}</text><text x="${VW/2}" y="${VH-pad}" text-anchor="middle" class="l2" style="font-size:${lf}px">${T.bot}</text>`;
  (T.block||[]).forEach(([x,y,w,h,t])=>{s+=`<rect class="blk" x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}"></rect>`;if(t)s+=`<text x="${X(x+w/2)}" y="${Y(y+h/2)+8}" text-anchor="middle" class="l2" style="font-size:${Math.min(lf,w*sc/(t.length*0.6))}px">${t}</text>`});
  const rs=useApt(a.__id||curApt);const has=k=>rs.find(r=>r.k===k);
- for(const k in T.rooms){if(has(k))continue;T.rooms[k].r.forEach(([x,y,w,h])=>{s+=`<rect class="blk" x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}"></rect>`})}
  for(const k in T.rooms){if(!has(k))continue;const st=roomStat(a,k);const c=sel?(k===sel?"sel":"dim"):(st.complete?"done":"");
   T.rooms[k].r.forEach(([x,y,w,h])=>{s+=sel?`<rect class="rm ${c}" x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}"></rect>`:`<rect class="rm ${c}" x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}" data-room="${k}" tabindex="0" role="button" aria-label="${esc(roomByK(k).name)}"></rect>`})}
  /* door openings: gap in the wall + short leaf mark */
@@ -785,7 +732,6 @@ function sketchPNG(a,typ,id){return new Promise(res=>{const T=SK[typ];if(!T)retu
  (T.block||[]).forEach(([x,y,w,h])=>{s+=`<rect x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}" fill="#eceff2" stroke="#c9d1d9" stroke-width="2"/>`});
  const rs=useApt(id);const has=k=>rs.find(r=>r.k===k);
  const fill=k=>{const st=roomStat(a,k);return st.defs?"#fbe4e1":st.na?"#fff1d6":st.complete?"#dff1e6":"#ffffff"};
- for(const k in T.rooms){if(has(k))continue;T.rooms[k].r.forEach(([x,y,w,h])=>{s+=`<rect x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}" fill="#eceff2" stroke="#c9d1d9" stroke-width="2"/>`})}
  for(const k in T.rooms){if(!has(k))continue;T.rooms[k].r.forEach(([x,y,w,h])=>{s+=`<rect x="${X(x)}" y="${Y(y)}" width="${w*sc}" height="${h*sc}" fill="${fill(k)}" stroke="#17202a" stroke-width="5"/>`})}
  const ln=(c,w,da)=>([x1,y1,x2,y2])=>`<line x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}" stroke="${c}" stroke-width="${w}"${da?` stroke-dasharray="${da}"`:""}/>`;
  for(const k in T.rooms){if(!has(k))continue;const R=T.rooms[k];s+=ln("#ffffff",10)(R.dr);if(R.open)s+=ln("#17202a",2,"7 7")(R.dr)}
@@ -808,7 +754,7 @@ async function buildPDF(id){const {jsPDF}=window.jspdf;const Pp=aptById(id);cons
  const head=(t)=>{doc.setFillColor(31,95,168);doc.rect(0,0,W,24,"F");doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(9);doc.text("HERAKLES JOINT INSPECTION - HUS B",M,9);
   doc.setFontSize(15);doc.text(T(t),M,18);doc.setTextColor(23,32,42);doc.setFont("helvetica","normal")};
  head(`LGH ${Pp.lgh} - modules ${Pp.mods}${a.rev?" - revision "+a.rev:""}`);
- const sg=a.signs||{};const info=[["Project","Herakles, Gävle - HUS B, plan "+Pp.plan],["Apartment",`LGH ${Pp.lgh} · TYP ${Pp.typ} · ${Pp.rok} RoK · ${Pp.m2} m2 · modules ${Pp.mods}`],["Inspection",`Joint visual inspection TLC + NT · checklist ${clvOf(id)===1?"v1 (first version)":"v2 for TYP "+baseTyp(Pp.typ)}`],
+ const sg=a.signs||{};const info=[["Project","Herakles, Gävle - HUS B, plan "+Pp.plan],["Apartment",`LGH ${Pp.lgh} · TYP ${Pp.typ} · ${Pp.rok} RoK · ${Pp.m2} m2 · modules ${Pp.mods}`],["Inspection","Joint visual inspection TLC + NT"],
   ["Started",dtF(a.startedAt)],["Walk-through finished",dtF(a.endedAt)],["Signed",dtF(a.signedAt)+(a.rev?` (revision ${a.rev})`:"")],
   ["Recorder",sg.rec?`${sg.rec.name} (${sg.rec.company})`:""],["Countersigned",sg.other?`${sg.other.name} (${sg.other.company})`:""],
   ["Result",`${st.n} items: ${st.ok} OK · ${st.nok} NOT OK · ${st.na} N/A${st.r2?` (${st.r2} OK in 2nd round)`:""}`],["Defects",`${st.defs} recorded${st.flag?` · ${st.flag} not agreed`:""}`]];
@@ -858,7 +804,7 @@ async function buildPDF(id){const {jsPDF}=window.jspdf;const Pp=aptById(id);cons
 
 /* one flat table per apartment – every checklist point and every defect (for collecting all reports) */
 function aptRows(Pp){useApt(Pp.id);const a=S().apts[Pp.id];if(!a)return [];const defs=orderedDefs(a);const no={};defs.forEach((d,k)=>no[d.id]="D"+(k+1));const out=[];
- const base={"LGH":Pp.lgh,"Modules":Pp.mods,"Plan":Pp.plan,"Type":Pp.typ,"Checklist":"v"+clvOf(Pp.id),"Started":dtF(a.startedAt),"Signed":dtF(a.signedAt),"Revision":a.signedAt?(a.rev||0):""};
+ const base={"LGH":Pp.lgh,"Modules":Pp.mods,"Plan":Pp.plan,"Type":Pp.typ,"Started":dtF(a.startedAt),"Signed":dtF(a.signedAt),"Revision":a.signedAt?(a.rev||0):""};
  const drow=(R,d,res)=>Object.assign({},base,{"Room":R.name,"Item":d.item,"Point":d.point,"Wall":d.wall||"","Result":res,"Defect no.":no[d.id],"Defect":issueTxt(d),"Category":d.cat,"Severity":d.sev,"Trade":d.trade,"Not agreed":d.flag?"YES":"","Note":d.issue==="Other"?"":(d.note||""),"Photos":(d.photos||[]).length||"","Round":d.rnd===2?"2nd":"1st","N/A reason":"","Recorded by":d.by||"","Time":dtF(d.at)});
  ROOMS.forEach(R=>{R.items.forEach(([name,pts],i)=>{const res=resultTxt(a,R.k,i);const key=R.k+":"+i;
   pts.forEach((p,j)=>{const ds=a.defects.filter(d=>d.room===R.k&&d.i===i&&d.j===j);
