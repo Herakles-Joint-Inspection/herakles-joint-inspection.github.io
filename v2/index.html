@@ -300,7 +300,8 @@ const LOWC=P("boards / paint · joint to wall · access hatch (filters)"),
  WARD=P("doors · hinges / adjustment · gaps · shelves / rail · screw covers · clean"),
  SLIDE=P("sliding / closing · doors aligned · track / guide · leaf · trim / list"),
  SHAFT=P("closed / boxed in · fire seal · water damage"),
- JOINT=P("floor joint · wall joint · ceiling joint");
+ JOINT=P("floor joint · wall joint · ceiling joint"),
+ WDMG=P("floor · wall bottom · ceiling · around pipes / shaft");
 /* frd: where the storage is opened from and the door kind · ward: wardrobes per room · shaft: room where the pipe shaft is reached ·
    joint: rooms the module joint runs through · kwin: kitchen has a window */
 const TSPEC={
@@ -330,6 +331,8 @@ function roomsOfV2(ap){const bt=baseTyp(ap.typ);const key="v2|"+bt+"|"+ap.lay+"|
  R.living={k:"living",name:"Living room",items:[["Window",WIN],...balIt,["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD],...wi("living"),...sh("living"),...jn("living")]};
  const bed=(k,nm,dn)=>({k,name:nm,items:[[dn,DOOR],["Window",WIN],["Skirting",SKIRT],["Floor",FLOOR],["Walls",WALLS],["Ceiling",CEIL],["Radiators",RAD],...wi(k),...sh(k),...jn(k)]});
  if(ap.lay==="3R"){R.bed1=bed("bed1","Bedroom 1","Bedroom 1 door");R.bed2=bed("bed2","Bedroom 2","Bedroom 2 door")}else if(ap.lay==="2R")R.bed1=bed("bed1","Bedroom","Bedroom door");
+ /* water damage: last item in every room (House B – many modules got wet) */
+ Object.values(R).forEach(r=>r.items.push(["Water damage",WDMG]));
  const fh=sp.frd&&sp.frd.from==="hall";const order=["hall","bath",fh?"frd":"","kitchen","living","bed1",fh?"":"frd","bed2"];
  const rs=order.filter(k=>k&&R[k]).map(k=>R[k]);RCACHE[key]=rs;return rs}
 /* which checklist an apartment uses: v1 if it was started before v2 existed, otherwise v2 */
@@ -365,7 +368,7 @@ function migrateToV2(id){const st=S();const a=st.apts[id];const ap=APTS.find(x=>
   d.room=t[0];d.i=t[1];if(d.j>=0){const pts=nR(t[0]).items[t[1]][1];let j=pts.indexOf(d.point);if(j<0)j=pts.findIndex(p=>p.startsWith(d.point)||String(d.point).startsWith(p));d.j=j}});
  if(signed){const used=new Set(Object.values(nmap).map(t=>t[0]+":"+t[1]));
   n.forEach(R=>R.items.forEach((_,i)=>{const key=R.k+":"+i;if(!used.has(key)&&!a.ok[key]&&!(key in a.na)&&!a.defects.some(d=>d.room===R.k&&d.i===i))a.na[key]="New in checklist v2"}))}
- a.clv=2;a.migratedAt=Date.now();if(wasClean)a.r2key=r2Key(a);return true}
+ a.clv=2;a.clr=2;a.migratedAt=Date.now();if(wasClean)a.r2key=r2Key(a);return true}
 function roomsOf(id){const ap=APTS.find(x=>x.id===id);if(!ap)return ROOMS3;return clvOf(id)===1?roomsOfV1(ap):roomsOfV2(ap)}
 let ROOMS=ROOMS3;function useApt(id){ROOMS=roomsOf(id);return ROOMS}
 const RNAME={hall:"Entrance / Hall",frd:"FRD (storage)",bath:"Bathroom",kitchen:"Kitchen",living:"Living room",bed1:"Bedroom 1",bed2:"Bedroom 2"};
@@ -430,13 +433,15 @@ const ISS=[
  [/frame|leaf|cover/,DOORISS],
  [/threshold|list|sill|floor|furniture|cabinet|hole|undamaged/,["Scratch","Dent / damage","Gap","Crack","Paint","Loose"]]];
 const TILEISS=["Cracked tile","Crack in corner","Gap / silicone in corner","Grout colour uneven","Chipped tile","Uneven tiles","Dirty"];
-const issuesFor=(pt,item)=>{if(/wall tiles/i.test(item||"")&&/^W\d/.test(pt))return TILEISS.concat(["Other"]);if(/clothes hanger/i.test(item||"")&&pt==="fixed")return ["Loose","Missing","Damaged","Plastic not removed","Other"];const p=pt.toLowerCase();const m=ISS.find(r=>r[0].test(p));return (m?m[1]:["Damaged","Scratch","Missing","Loose","Dirty","Not working"]).concat(["Other"])};
-function catOf(i){const s=i.toLowerCase();
+const WDISS=["Dry stain","Wet / active leak","Mould","Swollen floor / plywood to replace","Gypsum / paint damaged"];
+const WDSIZE=["S  < 0.1 m²","M  0.1–1 m²","L  > 1 m²"];
+const issuesFor=(pt,item)=>{if(item==="Water damage")return WDISS.concat(["Other"]);if(/wall tiles/i.test(item||"")&&/^W\d/.test(pt))return TILEISS.concat(["Other"]);if(/clothes hanger/i.test(item||"")&&pt==="fixed")return ["Loose","Missing","Damaged","Plastic not removed","Other"];const p=pt.toLowerCase();const m=ISS.find(r=>r[0].test(p));return (m?m[1]:["Damaged","Scratch","Missing","Loose","Dirty","Not working"]).concat(["Other"])};
+function catOf(i){const s=i.toLowerCase();if(WDISS.map(x=>x.toLowerCase()).includes(s))return "Water";
  if(/screw cover/.test(s))return "Finish";if(/screw/.test(s))return "Visible screws";if(/grout|tile/.test(s))return "Tiles";if(/tape|different colour|wrong colour|yellow|too much silicone|filler|nails/.test(s))return "Finish";if(/flush|grill gap|not level|not even/.test(s))return "Gap / fit";if(/curved|sagging|not straight/.test(s))return "Not straight";if(/plastic not removed/.test(s))return "Finish";if(/plywood|board to replace/.test(s))return "Water";if(/gypsum/.test(s))return "Damaged";if(/crack/.test(s))return "Crack";if(/paint/.test(s))return "Paint";if(/scratch/.test(s))return "Scratch";if(/gap|not sealed|too short|uneven/.test(s))return "Gap / fit";
  if(/dent|damaged/.test(s))return "Damaged";if(/missing/.test(s))return "Missing";if(/loose|moves/.test(s))return "Loose";
  if(/closing|hard to open|rubbing|adjust|not working|not aligned/.test(s))return "Function";if(/dirty/.test(s))return "Dirty";if(/water|swelling/.test(s))return "Water";if(/squeak/.test(s))return "Loose";return "Other"}
 const SEV=["Cosmetic","Repair","Replace"];
-function defaultSev(issue){const c=catOf(issue);if(c==="Paint"||c==="Dirty"||c==="Finish"||/hairline|light scratch|grout colour/i.test(issue))return "Cosmetic";if(c==="Missing")return "Replace";return "Repair"}
+function defaultSev(issue){if(issue==="Dry stain")return "Cosmetic";if(/^(Mould|Swollen floor)/.test(issue))return "Replace";if(WDISS.includes(issue))return "Repair";const c=catOf(issue);if(c==="Paint"||c==="Dirty"||c==="Finish"||/hairline|light scratch|grout colour/i.test(issue))return "Cosmetic";if(c==="Missing")return "Replace";return "Repair"}
 function trade(item,point,issue){const e=(item+" "+point).toLowerCase();
  if(/silicone|gasket/.test(point.toLowerCase())&&catOf(issue)!=="Paint")return "Silicone / sealant";
  if(/tile/.test(e))return "Tiler";
@@ -470,7 +475,7 @@ const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;"
 function toast(t){document.querySelectorAll(".toast").forEach(x=>x.remove());const d=document.createElement("div");d.className="toast";d.setAttribute("role","status");d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)}
 const aptById=id=>APTS.find(a=>a.id===id);const roomByK=k=>ROOMS.find(r=>r.k===k)||ROOMS3.find(r=>r.k===k);
 const newId=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-function A(id){const st=S();if(st.apts[id]&&!st.apts[id].clv)st.apts[id].clv=clvOf(id);if(!st.apts[id])st.apts[id]={clv:2,startedAt:null,endedAt:null,ok:{},na:{},r2ok:{},defects:[]};useApt(id);const a=st.apts[id];if(!a.na)a.na={};if(!a.r2ok)a.r2ok={};return a}
+function A(id){const st=S();if(st.apts[id]&&!st.apts[id].clv)st.apts[id].clv=clvOf(id);if(!st.apts[id])st.apts[id]={clv:2,clr:2,startedAt:null,endedAt:null,ok:{},na:{},r2ok:{},defects:[]};useApt(id);const a=st.apts[id];if(!a.na)a.na={};if(!a.r2ok)a.r2ok={};return a}
 const fmt=ms=>{const s=Math.max(0,Math.round(ms/1000));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
 const elapsed=a=>a.startedAt?((a.endedAt||Date.now())-a.startedAt):0;
 const TARGET=10*60*1000; /* one apartment = two modules */
@@ -537,7 +542,7 @@ function sketchSVG(a,typ,sel){const T=SK[typ];if(!T)return "";const M=Math.max(T
  if(!T.bg)for(const k in T.rooms){if(!has(k))continue;const R=T.rooms[k],[x1,y1,x2,y2]=R.dr;s+=`<line class="dgap" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line>`;if(R.open)s+=`<line class="dopen" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line>`}
  if(!T.bg)(T.opn||[]).forEach(([x1,y1,x2,y2])=>{s+=`<line class="dgap" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line><line class="dopen" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line>`});
  if(T.ent){const [x1,y1,x2,y2]=T.ent;const mx=(X(x1)+X(x2))/2;s+=`<line class="dent" x1="${X(x1)}" y1="${Y(y1)}" x2="${X(x2)}" y2="${Y(y2)}"></line><path class="dent-a" d="M${mx-13} ${Y(y1)-26} L${mx+13} ${Y(y1)-26} L${mx} ${Y(y1)-8} Z"></path>`}
- s+=markSVG(T,has,X,Y,sc);
+ s+=markSVG(T,has,X,Y,sc);s+=pinsSVG(a,X,Y,sc);
  for(const k in T.rooms){if(!has(k))continue;const [x,y,w,h]=T.rooms[k].r[0];const st=roomStat(a,k);
   if(!sel){const nm=(k==="bed1"&&!has("bed2"))?"Bed":({hall:"Hall",frd:"FRD",bath:"Bath",kitchen:"Kit.",living:"Living",bed1:"Bed 1",bed2:"Bed 2"})[k];const txt=nm+(st.complete?" ✓":"");
    const fs=Math.max(15,Math.min(M*sc*0.045,w*sc/(txt.length*0.62),h*sc*0.55));s+=`<text x="${X(x+w/2)}" y="${Y(y+h/2)+fs*0.35}" text-anchor="middle" class="sk${pl}" style="font-size:${fs.toFixed(0)}px">${txt}</text>`;
@@ -586,7 +591,7 @@ function viewApt(id){const Pp=aptById(id);const a=A(id);curApt=id;curRoom=null;h
   h+=`<button class="btn wide" id="share" style="margin-bottom:10px">${a.sentAt?"Send the report again":"Send report (PDF + CSV)"}</button>`}
  else if(all)h+=`<div class="box good" style="margin-bottom:12px"><b>Walk-through finished – ready to sign</b><span>Started ${clock(a.startedAt)} · last room done ${clock(a.endedAt)} (${fmt(elapsed(a))}) · ${a.defects.length} defect${a.defects.length===1?"":"s"}${nao.length?` · ${nao.length} item${nao.length>1?"s":""} N/A`:""}</span></div>`;
  if(all&&Object.keys(a.na).length)h+=`<button class="btn wide" id="r2" style="margin-bottom:12px">${nao.length?`2nd round: inspect the ${nao.length} N/A item${nao.length>1?"s":""}`:"2nd round – all N/A items inspected"}</button>`;
- h+=`<p class="sub">TYP ${Pp.typ} · ${Pp.rok} RoK · ${Pp.m2} m² · modules ${esc(Pp.mods)}${Pp.note?`<br><span class="muted">${esc(Pp.note)}</span>`:""}</p>${SK[Pp.typ]?`<div class="plan">${sketchSVG(a,Pp.typ,null)}</div>${SK[Pp.typ].bg?`<p class="muted sklg"><span style="color:#d0281c">&#9645;</span> pipe shaft &nbsp; <span style="color:#4a6fe0">&#9638;</span> lowered ceiling (filters)${/built on site/.test((roomByK("frd")||{}).name||"")?` &nbsp; <span style="color:#c97a00">&#9633;</span> FRD built on site`:""}</p>`:""}`:""}`;
+ h+=`<p class="sub">TYP ${Pp.typ} · ${Pp.rok} RoK · ${Pp.m2} m² · modules ${esc(Pp.mods)}${Pp.note?`<br><span class="muted">${esc(Pp.note)}</span>`:""}</p>${SK[Pp.typ]?`<div class="plan">${sketchSVG(a,Pp.typ,null)}</div>${SK[Pp.typ].bg?`<p class="muted sklg"><span style="color:#d0281c">&#9645;</span> pipe shaft &nbsp; <span style="color:#4a6fe0">&#9638;</span> lowered ceiling (filters) &nbsp; <span style="color:#1f6fd1">&#9679;</span> water damage${/built on site/.test((roomByK("frd")||{}).name||"")?` &nbsp; <span style="color:#c97a00">&#9633;</span> FRD built on site`:""}</p>`:""}`:""}`;
  h+=`<div class="list" style="margin-top:12px">${ROOMS.map(R=>{const st=roomStat(a,R.k);const pill=st.complete?(st.defs?`<span class="pill nok">${st.defs} defect${st.defs>1?"s":""}</span>`:st.na?`<span class="pill warn">${st.na} N/A</span>`:`<span class="pill ok">All OK</span>`):st.done?`<span class="pill acc">${st.done}/${st.n}</span>`:`<span class="pill">${st.n} items</span>`;
   return `<button class="rbtn${st.complete?" done":""}" data-room="${R.k}"><span>${esc(R.name)}${st.complete?" ✓":""}</span>${pill}</button>`}).join("")}</div>`;
  $app.innerHTML=h;
@@ -596,7 +601,7 @@ function viewApt(id){const Pp=aptById(id);const a=A(id);curApt=id;curRoom=null;h
  else dock(`<div class="info"><b>Signed${a.rev?" rev "+a.rev:""}</b>${a.sentAt?"Report sent":"Send the report by e-mail"}</div><button class="btn primary" id="share2">${a.sentAt?"Send again":"Send report"}</button>`);
  const gn=document.getElementById("goNext");if(gn)gn.onclick=()=>{const nx=ROOMS.find(R=>!roomStat(a,R.k).complete);location.hash=`r-${id}-${nx.k}`};
  const ts=document.getElementById("toSign");if(ts)ts.onclick=()=>{SG=null;location.hash="s-"+id};
- ["share","share2"].forEach(x=>{const b=document.getElementById(x);if(b)b.onclick=()=>shareReport(id)});
+ ["share","share2"].forEach(x=>{const b=document.getElementById(x);if(b)b.onclick=()=>{location.hash="m-"+id}});
  const r2=document.getElementById("r2");if(r2)r2.onclick=()=>{location.hash="n-"+id}}
 
 /* 2nd round: only the items that were N/A */
@@ -667,10 +672,10 @@ $app.addEventListener("keydown",e=>{const p=e.target.closest&&e.target.closest("
 const $sheet=document.getElementById("sheet");const cam=document.getElementById("cam");
 let C=null; /* the defect(s) being recorded */
 function openCapture(apt,room,i,j,rnd){const a=A(apt);touch(a);const it=i>=0?roomByK(room).items[i]:["",[]];const item=it[0],pts=it[1];
- C={apt,room,i,j,rnd:rnd||1,item,point:j>=0?pts[j]:"",customItem:i<0,customPoint:j<0,editId:null,orig:[],photos:[],ps:"none",issues:[],sev:null,sevTouched:false,flag:false,note:""};
+ C={apt,room,i,j,rnd:rnd||1,item,point:j>=0?pts[j]:"",customItem:i<0,customPoint:j<0,editId:null,orig:[],photos:[],ps:"none",issues:[],sev:null,sevTouched:false,flag:false,note:"",size:null,pin:null};
  renderSheet();$sheet.hidden=false} /* record the defect first; the camera opens only when "Take photo" is tapped */
 function openEdit(apt,d){const ph=d.photos?d.photos.slice():(d.photo?[d.photo]:[]);
- C={apt,room:d.room,i:d.i,j:d.j,rnd:d.rnd||1,item:d.item,point:d.point,customItem:d.i<0,customPoint:d.j<0,editId:d.id,orig:ph.slice(),photos:ph,ps:"ok",issues:[d.issue],sev:d.sev,sevTouched:true,flag:d.flag,note:d.note||""};renderSheet();$sheet.hidden=false}
+ C={apt,room:d.room,i:d.i,j:d.j,rnd:d.rnd||1,item:d.item,point:d.point,customItem:d.i<0,customPoint:d.j<0,editId:d.id,orig:ph.slice(),photos:ph,ps:"ok",issues:[d.issue],sev:d.sev,sevTouched:true,flag:d.flag,note:d.note||"",size:d.size||null,pin:d.pin||null};renderSheet();$sheet.hidden=false}
 function closeSheet(){$sheet.hidden=true;$sheet.innerHTML="";C=null;render()}
 const photoInUse=id=>Object.values(S().apts).some(a=>a.defects.some(d=>(d.photos||[]).includes(id)||d.photo===id));
 cam.addEventListener("change",async()=>{const f=cam.files&&cam.files[0];if(!f||!C)return;const mine=C;
@@ -687,6 +692,20 @@ async function shrink(file){const MAX=1600;
 function photoHTML(){const n=C.photos.length;
  const st=C.ps==="saving"?`<span class="st-wait">Saving photo…</span>`:C.ps==="mem"?`<span class="st-wait">Photo kept – phone storage unavailable</span>`:n?`<span class="st-ok">${n} photo${n>1?"s":""} saved ✓</span>`:`<span class="muted">No photo – optional</span>`;
  return `<div class="phstrip">${C.photos.map(id=>`<span class="phw"><img class="th" src="${photoURL(id)}" alt="Defect photo"><button class="phx" data-rmph="${id}" aria-label="Remove photo">×</button></span>`).join("")}<button class="addph2" data-x="addph">＋<small>${n?"Add photo":"Take photo"}</small></button></div><span class="st">${st}</span>`}
+/* water damage: small plan in the defect sheet – tap to mark the place (stored in dm on the type sketch) */
+function wdPlanSVG(){const Pp=aptById(C.apt);const T=Pp&&SK[Pp.typ];if(!T)return "";const R=T.rooms[C.room];
+ let s=`<svg viewBox="-1 -1 ${T.W+2} ${T.H+2}" style="width:100%;max-height:300px;touch-action:manipulation" data-wdsvg="1"><rect x="-1" y="-1" width="${T.W+2}" height="${T.H+2}" fill="#fff"/>`;
+ if(T.bg)s+=`<image href="${T.bg}" x="0" y="0" width="${T.W}" height="${T.H}" preserveAspectRatio="none"/>`;
+ if(R)R.r.forEach(([x,y,w,h])=>{s+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#1f6fd1" fill-opacity=".10" stroke="#1f6fd1" stroke-width=".35"/>`});
+ if(C.pin)s+=`<g><circle cx="${C.pin[0]}" cy="${C.pin[1]}" r="2.2" fill="#1f6fd1" stroke="#fff" stroke-width=".6"/><circle cx="${C.pin[0]}" cy="${C.pin[1]}" r=".6" fill="#fff"/></g>`;
+ return s+`</svg>${C.pin?`<button class="chip" data-wpinclr="1" style="margin-top:6px">Remove the mark</button>`:`<span class="muted" style="font-size:13px">Tap where the damage is</span>`}`}
+$sheet.addEventListener("pointerup",e=>{const sv=e.target.closest("svg[data-wdsvg]");if(!sv||!C)return;const Pp=aptById(C.apt);const T=SK[Pp.typ];const b=sv.getBoundingClientRect();
+ const sc=Math.min(b.width/(T.W+2),b.height/(T.H+2));const ox=b.left+(b.width-(T.W+2)*sc)/2,oy=b.top+(b.height-(T.H+2)*sc)/2;
+ const x=(e.clientX-ox)/sc-1,y=(e.clientY-oy)/sc-1;if(x<0||y<0||x>T.W||y>T.H)return;C.pin=[Math.round(x*10)/10,Math.round(y*10)/10];const box=document.getElementById("wdplan");if(box)box.innerHTML=wdPlanSVG()});
+$sheet.addEventListener("click",e=>{const t=e.target.closest("[data-wpinclr]");if(t&&C){C.pin=null;const box=document.getElementById("wdplan");if(box)box.innerHTML=wdPlanSVG()}});
+const wdDefs=a=>orderedDefs(a).filter(d=>d.item==="Water damage");
+function pinsSVG(a,X,Y,sc,pdf){let s="";wdDefs(a).forEach((d,k)=>{if(!d.pin)return;const r=pdf?15:13,cx=X(d.pin[0]),cy=Y(d.pin[1]);
+  s+=`<g><circle cx="${cx}" cy="${cy}" r="${r}" fill="#1f6fd1" stroke="#ffffff" stroke-width="3"/><text x="${cx}" y="${cy+r*0.38}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="bold" font-size="${r*1.05}" fill="#ffffff">${k+1}</text></g>`});return s}
 function renderPhoto(){const b=document.getElementById("phbox");if(b)b.innerHTML=photoHTML()}
 function renderSheet(){const R=roomByK(C.room);const iss=C.customPoint?issuesFor("~"):issuesFor(C.point,C.item);const multi=!C.editId;const n=C.issues.length;
  const title=C.customItem?(C.item||"Other item"):C.item+(C.customPoint?" · "+(C.point||"other point"):C.point.toLowerCase()!==C.item.toLowerCase()?" · "+C.point:"");
@@ -696,6 +715,8 @@ function renderSheet(){const R=roomByK(C.room);const iss=C.customPoint?issuesFor
   ${C.customPoint?`<div class="field" style="margin:0"><label for="cpoint">${C.customItem?"Where / which part (optional)":"Point – which part?"}</label><input type="text" id="cpoint" value="${esc(C.point)}" placeholder="e.g. hinge, lock, cover plate"></div>`:""}
   <div class="grp"><span class="lab">What is wrong?${multi?" Tick all that apply":""}</span><div class="chips">${iss.map(x=>`<button class="chip" data-iss="${esc(x)}" aria-pressed="${C.issues.includes(x)}">${esc(x)}</button>`).join("")}</div></div>
   <div class="grp"><span class="lab">Photo (optional)</span><div class="phbox" id="phbox">${photoHTML()}</div></div>
+  ${C.item==="Water damage"?`<div class="grp"><span class="lab">Size of the damaged area</span><div class="seg3">${WDSIZE.map(z=>`<button data-wsize="${z}" aria-pressed="${C.size===z}">${z.replace(/  /," ")}</button>`).join("")}</div></div>
+  <div class="grp"><span class="lab">Where – tap the plan (optional)</span><div class="wdplan" id="wdplan">${wdPlanSVG()}</div></div>`:""}
   ${n?`<div class="grp"><span class="lab">Severity${n>1?" (for all ticked)":""}</span><div class="seg3">${SEV.map(s=>`<button data-sev="${s}" aria-pressed="${C.sevTouched?C.sev===s:(n===1&&defaultSev(C.issues[0])===s)}">${s}</button>`).join("")}</div></div>
   <button class="flag" data-x="flag" aria-pressed="${C.flag}">⚑ Not agreed by the other company</button>
   <div class="field" style="margin:0"><label for="dnote">${C.issues.includes("Other")?"Describe the defect":"Note (optional)"} – use the mic on your keyboard to speak</label><input type="text" id="dnote" value="${esc(C.note)}" placeholder="e.g. 30 cm above the socket"></div>`:""}
@@ -707,6 +728,7 @@ function renderSheet(){const R=roomByK(C.room);const iss=C.customPoint?issuesFor
 $sheet.addEventListener("click",e=>{const t=e.target.closest("button");if(!t||!C)return;
  if(t.dataset.iss){const x=t.dataset.iss;if(C.editId)C.issues=[x];else C.issues=C.issues.includes(x)?C.issues.filter(y=>y!==x):C.issues.concat([x]);renderSheet();return}
  if(t.dataset.sev){C.sev=t.dataset.sev;C.sevTouched=true;renderSheet();return}
+ if(t.dataset.wsize){C.size=C.size===t.dataset.wsize?null:t.dataset.wsize;renderSheet();return}
  if(t.dataset.rmph){const id=t.dataset.rmph;C.photos=C.photos.filter(x=>x!==id);if(!C.orig.includes(id))del("photos",id);renderPhoto();return}
  const x=t.dataset.x;
  if(x==="flag"){C.flag=!C.flag;t.setAttribute("aria-pressed",C.flag);return}
@@ -720,7 +742,7 @@ function commit(){if(!C.issues.length)return;const a=A(C.apt);const st=S();
  if(C.customPoint&&!C.customItem&&!C.point){toast("Type which part is not OK");const f=document.getElementById("cpoint");if(f)f.focus();return}
  if(C.issues.includes("Other")&&!(C.note||"").trim()){toast("Describe the defect in the note");const f=document.getElementById("dnote");if(f)f.focus();return}
  if(C.customItem&&!C.point)C.point="(other item)";
- const mk=(issue,id)=>({id,room:C.room,i:C.i,j:C.j,rnd:C.rnd,item:C.item,point:C.point,wall:wallOf(C.point),issue,cat:catOf(issue),sev:C.sevTouched?C.sev:defaultSev(issue),trade:trade(C.item,C.point,issue),flag:!!C.flag,note:(C.note||"").trim(),photos:C.photos.slice(),at:Date.now(),by:st.me?st.me.name:""});
+ const mk=(issue,id)=>({id,room:C.room,i:C.i,j:C.j,rnd:C.rnd,item:C.item,point:C.point,wall:wallOf(C.point),issue,cat:catOf(issue),sev:C.sevTouched?C.sev:defaultSev(issue),trade:trade(C.item,C.point,issue),flag:!!C.flag,note:(C.note||"").trim(),photos:C.photos.slice(),at:Date.now(),by:st.me?st.me.name:"",size:C.item==="Water damage"?C.size:undefined,pin:C.item==="Water damage"&&C.pin?C.pin.slice():undefined});
  if(C.editId){const ix=a.defects.findIndex(z=>z.id===C.editId);const rec=mk(C.issues[0],C.editId);if(ix>=0){rec.at=a.defects[ix].at;a.defects[ix]=rec}C.orig.filter(id=>!C.photos.includes(id)).forEach(id=>{if(!photoInUse(id))del("photos",id)})}
  else C.issues.forEach(issue=>a.defects.push(mk(issue,newId("d"))));
  if(C.i>=0){delete a.ok[C.room+":"+C.i];if(C.rnd!==2){delete a.na[C.room+":"+C.i];openItem=roomByK(C.room).items[C.i][1].length>1?C.i:null}else delete a.r2ok[C.room+":"+C.i]}touch(a);saveState();
@@ -833,7 +855,7 @@ function viewSign(id){const Pp=aptById(id);const a=A(id);curApt=id;curRoom="__si
   const now=Date.now();const oth={name:nm,company:SG.co,sig:pad.png(),at:now};
   a.history=(a.history||[]).concat([{rev:rv,signedAt:now,rec:{name:SG.rec.name,company:SG.rec.company,at:SG.rec.at},other:{name:nm,company:SG.co,at:now}}]);
   a.signs={rec:SG.rec,other:oth};a.signedAt=now;a.rev=rv;a.r2key=r2Key(a);a.sentAt=null;SG=null;saveState();
-  location.hash="a-"+id;toast(rv?`Revision ${rv} signed – send the report again`:"Signed and locked – send the report")}}
+  location.hash="m-"+id;toast(rv?`Revision ${rv} signed – send the report again`:"Signed and locked – send the report")}}
 
 /* sketch as an image for the report */
 function sketchPNG(a,typ,id){return new Promise(res=>{const T=SK[typ];if(!T)return res(null);const M=Math.max(T.W,T.H),sc=900/M,pad=24,lf=26;
@@ -850,13 +872,13 @@ function sketchPNG(a,typ,id){return new Promise(res=>{const T=SK[typ];if(!T)retu
  if(!T.bg){for(const k in T.rooms){if(!has(k))continue;const R=T.rooms[k];s+=ln("#ffffff",10)(R.dr);if(R.open)s+=ln("#17202a",2,"7 7")(R.dr)}
  (T.opn||[]).forEach(o=>{s+=ln("#ffffff",10)(o)+ln("#17202a",2,"7 7")(o)})}
  if(T.ent){const [x1,y1,x2]=T.ent;const mx=(X(x1)+X(x2))/2;s+=ln("#1f5fa8",10)(T.ent)+`<path d="M${mx-14} ${Y(y1)-28} L${mx+14} ${Y(y1)-28} L${mx} ${Y(y1)-9} Z" fill="#1f5fa8"/>`}
- s+=markSVG(T,has,X,Y,sc,1);const halo=T.bg?` stroke="#ffffff" stroke-width="6" stroke-linejoin="round" paint-order="stroke"`:"";
+ s+=markSVG(T,has,X,Y,sc,1);s+=pinsSVG(a,X,Y,sc,1);const halo=T.bg?` stroke="#ffffff" stroke-width="6" stroke-linejoin="round" paint-order="stroke"`:"";
  for(const k in T.rooms){if(!has(k))continue;const [x,y,w,h]=T.rooms[k].r[0];const st=roomStat(a,k);
   const nm=(k==="bed1"&&!has("bed2"))?"Bedroom":({hall:"Hall",frd:"FRD",bath:"Bath",kitchen:"Kitchen",living:"Living",bed1:"Bed 1",bed2:"Bed 2"})[k];
   const fs=Math.max(15,Math.min(M*sc*0.045,w*sc/(nm.length*0.62),h*sc*0.4));const sub=st.defs?`${st.defs} defect${st.defs>1?"s":""}`:st.na?`${st.na} N/A`:"";
   s+=`<text x="${X(x+w/2)}" y="${Y(y+h/2)+(sub?-2:fs*0.35)}" text-anchor="middle" font-family="${F}" font-weight="bold" font-size="${fs.toFixed(0)}" fill="#17202a"${halo}>${nm}</text>`;
   if(sub)s+=`<text x="${X(x+w/2)}" y="${Y(y+h/2)+fs*0.95}" text-anchor="middle" font-family="${F}" font-size="${(fs*0.75).toFixed(0)}" fill="${st.defs?"#b42318":"#a86200"}"${halo}>${sub}</text>`}
- s+=`</svg>`;const img=new Image();img.onload=()=>{const c=document.createElement("canvas");c.width=VW;c.height=VH;c.getContext("2d").drawImage(img,0,0);res({url:c.toDataURL("image/png"),w:VW,h:VH})};img.onerror=()=>res(null);
+ s+=`</svg>`;const img=new Image();img.onload=()=>{const c=document.createElement("canvas");c.width=VW;c.height=VH;c.getContext("2d").drawImage(img,0,0);res({url:c.toDataURL("image/jpeg",0.88),w:VW,h:VH})};img.onerror=()=>res(null);
  img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s)})}
 
 const pdfTxt=s=>String(s==null?"":s).replace(/[–—]/g,"-").replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/→/g,"->").replace(/[✓✔]/g,"").replace(/⚑/g,"").replace(/…/g,"...").replace(/[^\x00-\xFF]/g,"").trim();
@@ -875,9 +897,13 @@ async function buildPDF(id){const {jsPDF}=window.jspdf;const Pp=aptById(id);cons
  if((a.history||[]).length>1)info.push(["Revisions",a.history.map(hh=>`rev ${hh.rev}: ${dtF(hh.signedAt)}`).join(" · ")]);
  doc.autoTable({startY:30,body:info.map(r=>r.map(T)),theme:"plain",styles:{fontSize:9.5,cellPadding:1.2,textColor:[23,32,42]},columnStyles:{0:{fontStyle:"bold",cellWidth:40}},margin:{left:M,right:M}});
  let y=doc.lastAutoTable.finalY+4;const pic=await sketchPNG(a,Pp.typ,id);
- if(pic){let w=150,h=w*pic.h/pic.w;if(h>140){h=140;w=h*pic.w/pic.h}if(y+h>275){doc.addPage();y=16}doc.addImage(pic.url,"PNG",(W-w)/2,y,w,h);y+=h+3}
+ if(pic){let w=150,h=w*pic.h/pic.w;if(h>140){h=140;w=h*pic.w/pic.h}if(y+h>275){doc.addPage();y=16}doc.addImage(pic.url,"JPEG",(W-w)/2,y,w,h);y+=h+3}
+ {const wd=wdDefs(a);const wdItems=ROOMS.filter(R=>R.items.some(it=>it[0]==="Water damage"));
+  if(wdItems.length){if(y>245){doc.addPage();y=16}doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(31,111,209);doc.text(T(wd.length?`Water damage – ${wd.length} place${wd.length>1?"s":""} (blue numbers on the plan)`:"Water damage – none found"),M,y+4);doc.setTextColor(23,32,42);doc.setFont("helvetica","normal");y+=6;
+   if(wd.length){doc.autoTable({startY:y,head:[["Plan","Room","Where","Type","Size","Defect"]],body:wd.map((d,k)=>[d.pin?String(k+1):"–",T(roomByK(d.room).name.replace(/ \(.*\)/,"")),T(d.point),T(issueTxt(d)),T((d.size||"").replace(/\s+/g," ")),no[d.id]]),
+    theme:"grid",styles:{fontSize:8,cellPadding:1.2,lineColor:[212,219,226],lineWidth:.2,textColor:[23,32,42]},headStyles:{fillColor:[226,236,248],textColor:[31,111,209],fontStyle:"bold"},margin:{left:M,right:M}});y=doc.lastAutoTable.finalY+3}}}
  doc.setFontSize(8.5);doc.setTextColor(91,105,119);
- doc.text(doc.splitTextToSize(T("Green = room OK · red = defects · orange = not able to inspect (N/A). Walls: standing in the doorway facing into the room, W1 is the wall on the left, then clockwise; W4 is the wall with the door. W1-W2 etc. = the corner between two walls. Plan: TLC building layout M-40-P rev M (TLC furniture only). Red outlined area = pipe shaft; blue hatch = lowered ceiling (ventilation filters); orange dashed = FRD built on site."),W-2*M),M,y+2);doc.setTextColor(23,32,42);
+ doc.text(doc.splitTextToSize(T("Green = room OK · red = defects · orange = not able to inspect (N/A). Walls: standing in the doorway facing into the room, W1 is the wall on the left, then clockwise; W4 is the wall with the door. W1-W2 etc. = the corner between two walls. Plan: TLC building layout M-40-P rev M (TLC furniture only). Red outlined area = pipe shaft; blue hatch = lowered ceiling (ventilation filters); orange dashed = FRD built on site; blue numbers = water damage (see the table)."),W-2*M),M,y+2);doc.setTextColor(23,32,42);
  /* checklist */
  doc.addPage();head(`LGH ${Pp.lgh} - checklist`);y=30;
  const dTxt=d=>`${no[d.id]} ${d.point&&d.point.toLowerCase()!==d.item.toLowerCase()?d.point+": ":""}${issueTxt(d)} (${d.sev})${d.rnd===2?" [2nd round]":""}${d.flag?" NOT AGREED":""}`;
@@ -891,7 +917,7 @@ async function buildPDF(id){const {jsPDF}=window.jspdf;const Pp=aptById(id);cons
  /* defect list */
  if(defs.length){doc.addPage();head(`LGH ${Pp.lgh} - defect list`);
   doc.autoTable({startY:30,head:[["No.","Room","Item · point","Defect","Sev.","Trade","Note","Photo","Agreed"]],
-   body:defs.map(d=>[no[d.id],T(roomByK(d.room).name.replace(/ \(.*\)/,"")),T(d.item+(d.point&&d.point.toLowerCase()!==d.item.toLowerCase()?" · "+d.point:"")),T(issueTxt(d)),d.sev,T(d.trade),T(d.issue==="Other"?"":d.note||""),(d.photos||[]).length||"",(d.flag?"NOT AGREED":"")+(d.rnd===2?(d.flag?" · ":"")+"2nd round":"")]),
+   body:defs.map(d=>[no[d.id],T(roomByK(d.room).name.replace(/ \(.*\)/,"")),T(d.item+(d.point&&d.point.toLowerCase()!==d.item.toLowerCase()?" · "+d.point:"")),T(issueTxt(d)+(d.size?" ("+d.size.replace(/\s+/g," ")+")":"")),d.sev,T(d.trade),T(d.issue==="Other"?"":d.note||""),(d.photos||[]).length||"",(d.flag?"NOT AGREED":"")+(d.rnd===2?(d.flag?" · ":"")+"2nd round":"")]),
    theme:"grid",styles:{fontSize:7.8,cellPadding:1.3,lineColor:[212,219,226],lineWidth:.2,textColor:[23,32,42]},headStyles:{fillColor:[242,244,246],textColor:[91,105,119],fontStyle:"bold"},
    columnStyles:{0:{cellWidth:10,fontStyle:"bold"},1:{cellWidth:20},2:{cellWidth:36},3:{cellWidth:32},4:{cellWidth:14},5:{cellWidth:20},6:{cellWidth:"auto"},7:{cellWidth:11},8:{cellWidth:17}},margin:{left:M,right:M,top:28},
    didParseCell:d=>{if(d.section==="body"&&d.column.index===8&&String(d.cell.raw).includes("NOT AGREED"))d.cell.styles.textColor=[168,98,0]}})}
@@ -919,7 +945,7 @@ async function buildPDF(id){const {jsPDF}=window.jspdf;const Pp=aptById(id);cons
 /* one flat table per apartment – every checklist point and every defect (for collecting all reports) */
 function aptRows(Pp){useApt(Pp.id);const a=S().apts[Pp.id];if(!a)return [];const defs=orderedDefs(a);const no={};defs.forEach((d,k)=>no[d.id]="D"+(k+1));const out=[];
  const base={"LGH":Pp.lgh,"Modules":Pp.mods,"Plan":Pp.plan,"Type":Pp.typ,"Checklist":"v"+clvOf(Pp.id),"Started":dtF(a.startedAt),"Signed":dtF(a.signedAt),"Revision":a.signedAt?(a.rev||0):""};
- const drow=(R,d,res)=>Object.assign({},base,{"Room":R.name,"Item":d.item,"Point":d.point,"Wall":d.wall||"","Result":res,"Defect no.":no[d.id],"Defect":issueTxt(d),"Category":d.cat,"Severity":d.sev,"Trade":d.trade,"Not agreed":d.flag?"YES":"","Note":d.issue==="Other"?"":(d.note||""),"Photos":(d.photos||[]).length||"","Round":d.rnd===2?"2nd":"1st","N/A reason":"","Recorded by":d.by||"","Time":dtF(d.at)});
+ const drow=(R,d,res)=>Object.assign({},base,{"Room":R.name,"Item":d.item,"Point":d.point,"Wall":d.wall||"","Result":res,"Defect no.":no[d.id],"Defect":issueTxt(d),"Category":d.cat,"Severity":d.sev,"Trade":d.trade,"Not agreed":d.flag?"YES":"","Note":d.issue==="Other"?"":(d.note||""),"Photos":(d.photos||[]).length||"","Round":d.rnd===2?"2nd":"1st","N/A reason":"","Recorded by":d.by||"","Time":dtF(d.at),"Size":d.size?d.size.replace(/\s+/g," "):"","Plan position (dm)":d.pin?d.pin.join(" / "):""});
  ROOMS.forEach(R=>{R.items.forEach(([name,pts],i)=>{const res=resultTxt(a,R.k,i);const key=R.k+":"+i;
   pts.forEach((p,j)=>{const ds=a.defects.filter(d=>d.room===R.k&&d.i===i&&d.j===j);
    if(ds.length)ds.forEach(d=>out.push(drow(R,d,res)));
@@ -946,7 +972,9 @@ async function shareReport(id){if(sharing)return;const Pp=aptById(id);const a=A(
 /* ===== OneDrive sync (Microsoft 365, app "Herakles Joint Inspection" in the Mercury tenant) =====
    every apartment is one JSON file and every photo one JPG in OneDrive: TLC PROJECTS/HERAKLES/Inspection app/data
    the phone keeps working without signal; changes are sent when there is signal, and other devices pick them up */
-const SY={clientId:"9c35223e-193b-47f3-bae1-cac6155c5262",tenant:"77c3de7b-4cbc-4df1-a204-83c9a1b8da4b",root:"TLC PROJECTS/HERAKLES/Inspection app/data",scopes:["Files.ReadWrite","User.Read"]};
+const SY={clientId:"9c35223e-193b-47f3-bae1-cac6155c5262",tenant:"77c3de7b-4cbc-4df1-a204-83c9a1b8da4b",root:"TLC PROJECTS/HERAKLES/Inspection app/data",reports:"TLC PROJECTS/HERAKLES/Inspection reports/HUS B/Signed reports",scopes:["Files.ReadWrite","User.Read"],mail:["Mail.Send"]};
+/* distribution list for the signed reports (agreed with Dan 16 Nov) */
+const MAILTO=[["Robin Rask","robin.rask@newtime.se"],["Nicklas Palm","nicklas.palm@newtime.se"],["Richard Lantz","richard.lantz@newtime.se"],["Joey Zong","joey.zong@cimc.com"],["Evan Wang","evan.wang@cimc.com"],["Jinxiang Zhou","jinxiang.zhou@cimc.com"]];
 const sy={app:null,acct:null,meta:{etag:{},hash:{},up:{},dev:null},status:"off",msg:"",busy:false,again:false,t:null,last:0,err:""};
 const gEnc=p=>p.split("/").map(encodeURIComponent).join("/");
 function hashOf(o,noMt){const s=JSON.stringify(o,(k,v)=>k==="v1"||(noMt&&k==="mt")?undefined:v);let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)+":"+s.length}
@@ -957,18 +985,19 @@ function syncLabel(){if(!window.msal)return "";const n=Object.keys(S().apts).fil
  const txt=sy.status==="busy"?"OneDrive: syncing…":sy.status==="offline"?`OneDrive: no signal${n?` · ${n} change${n>1?"s":""} waiting`:""}`:sy.status==="error"?`OneDrive: not synced${n?` · ${n} waiting`:""} – tap to retry`:`OneDrive ✓ synced ${clock(sy.last)}`;
  return `<button class="chip" id="syncNow" style="min-height:36px">${esc(txt)}</button>`}
 function syncPaint(){const el=document.getElementById("syncbox");if(el){el.innerHTML=syncLabel();syncWire()}}
-function syncWire(){const on=document.getElementById("syncOn");if(on)on.onclick=()=>{try{sy.app.loginRedirect({scopes:SY.scopes,prompt:"select_account"})}catch(e){toast("Could not open the Microsoft sign-in")}};
+function syncWire(){const on=document.getElementById("syncOn");if(on)on.onclick=()=>{try{sy.app.loginRedirect({scopes:SY.scopes,extraScopesToConsent:SY.mail,prompt:"select_account"})}catch(e){toast("Could not open the Microsoft sign-in")}};
  const nw=document.getElementById("syncNow");if(nw)nw.onclick=()=>{if(sy.status==="error"&&sy.err)toast(sy.err);syncNow()}}
 function setSync(s,m){sy.status=s;if(m!==undefined)sy.err=m;syncPaint()}
 function schedSync(){if(!sy.acct)return;clearTimeout(sy.t);sy.t=setTimeout(syncNow,3000)}
 async function syToken(){try{const r=await sy.app.acquireTokenSilent({scopes:SY.scopes,account:sy.acct});return r.accessToken}catch(e){setSync("login");throw e}}
-async function gr(path,opt={}){const tk=await syToken();const r=await fetch("https://graph.microsoft.com/v1.0"+path,Object.assign({},opt,{headers:Object.assign({Authorization:"Bearer "+tk},opt.headers||{})}));return r}
+async function gr(path,opt={},scopes){const tk=scopes?(await sy.app.acquireTokenSilent({scopes,account:sy.acct})).accessToken:await syToken();const r=await fetch("https://graph.microsoft.com/v1.0"+path,Object.assign({},opt,{headers:Object.assign({Authorization:"Bearer "+tk},opt.headers||{})}));return r}
 const pItem=rel=>`/me/drive/root:/${gEnc(SY.root+"/"+rel)}:`;
 async function syncInit(){if(!window.msal)return;try{
  sy.app=new msal.PublicClientApplication({auth:{clientId:SY.clientId,authority:"https://login.microsoftonline.com/"+SY.tenant,redirectUri:location.origin+location.pathname.replace(/index\.html$/,""),navigateToLoginRequestUrl:false,OIDCOptions:{serverResponseType:"query",defaultScopes:["openid","profile","offline_access"]}},cache:{cacheLocation:"localStorage"}});
  await sy.app.initialize();const r=await sy.app.handleRedirectPromise();if(r&&r.account)sy.app.setActiveAccount(r.account);
  if(/[?&](code|error|state)=/.test(location.search))history.replaceState(null,"",location.pathname+location.hash);
  sy.acct=sy.app.getActiveAccount()||sy.app.getAllAccounts()[0]||null;
+ try{const pm=sessionStorage.getItem("mailAfterLogin");if(pm&&r){sessionStorage.removeItem("mailAfterLogin");location.hash="m-"+pm}}catch(e){}
  const kv=await getAll("kv");if(kv.sync)sy.meta=Object.assign(sy.meta,kv.sync);if(!sy.meta.dev){sy.meta.dev=Math.random().toString(36).slice(2,8);saveMeta()}
  if(sy.acct){setSync("ok");syncNow();setInterval(()=>{if(document.visibilityState==="visible")syncNow()},60000);window.addEventListener("online",()=>syncNow());
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncNow()})}
@@ -1007,9 +1036,55 @@ async function syncNow(){if(!sy.acct)return;if(sy.busy){sy.again=true;return}if(
  sy.busy=true;setSync("busy");try{await backupOnce();const got=await pullAll();
   const st=S();for(const id of Object.keys(st.apts)){const a=st.apts[id];if(!a.startedAt&&!a.signedAt&&!(a.defects||[]).length&&!Object.keys(a.ok||{}).length&&!Object.keys(a.na||{}).length)continue;if(syDirty(id))await pushOne(id)}
   await photosSync();await put("kv","state",JSON.parse(JSON.stringify(mem.state)));await saveMeta();sy.last=Date.now();setSync("ok","");
+  setTimeout(sendQueuedMail,500);
   if(got&&$sheet.hidden)render()}
  catch(e){console.error("sync",e);if(sy.status!=="login")setSync(navigator.onLine?"error":"offline",String(e&&e.message||e))}
  finally{sy.busy=false;if(sy.again){sy.again=false;schedSync()}}}
+
+/* ===== send the signed report by e-mail from the recorder's Outlook (Microsoft Graph, Mail.Send) ===== */
+const modsTxt=m=>String(m||"").replace(/\s*\(.*\)\s*/,"").split("+").map(x=>x.trim()).filter(Boolean);
+function mailSubject(Pp,a){const ms=modsTxt(Pp.mods);return `HusB - Plan ${Pp.plan} - Ap ${Pp.lgh} (${ms.length>1?"Modules":"Module"} ${ms.join(" + ")})${a.rev?" - Rev "+a.rev:""}`}
+function mailBody(Pp,a){const st=aptStat(a);const sg=a.signs||{};const me=(S().me||{}).name||"";const ms=modsTxt(Pp.mods);const wd=wdDefs(a).length;
+ return `<p>Hi all,</p><p>Please find attached the signed joint inspection report${a.rev?` (revision ${a.rev})`:""} for HUS B, plan ${Pp.plan}, apartment ${esc(Pp.lgh)} (${ms.length>1?"modules":"module"} ${ms.join(" + ")}), TYP ${esc(Pp.typ)}.</p>
+ <p>Signed by ${esc(sg.rec?sg.rec.name+" ("+sg.rec.company+")":"")} and ${esc(sg.other?sg.other.name+" ("+sg.other.company+")":"")} on ${dtF(a.signedAt)}.<br>Result: ${st.ok} items OK · ${st.defs} defect${st.defs===1?"":"s"}${wd?` (${wd} water damage)`:""} · ${st.na} not able to inspect${st.na?" (2nd round)":""}.</p>
+ <p>PDF = signed report with plan, defect list and photos · CSV = all points and defects (opens in Excel).</p><p>Best regards,<br>${esc(me)}</p>`}
+const b64=buf=>{let s="";const u=new Uint8Array(buf);for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)};
+async function makeReportFiles(id){const Pp=aptById(id);const a=A(id);const pdf=await buildPDF(id);const csv=new Blob([toCSV(aptRows(Pp))],{type:"text/csv"});const base=fileBase(Pp,a);
+ return [{name:base+".pdf",type:"application/pdf",blob:pdf},{name:base+".csv",type:"text/csv",blob:csv}]}
+async function gUploadSession(url,blob,driveStyle){const CH=driveStyle?327680*12:3*1024*1024;let pos=0;
+ while(pos<blob.size){const part=blob.slice(pos,Math.min(blob.size,pos+CH));const r=await fetch(url,{method:"PUT",headers:{"Content-Range":`bytes ${pos}-${pos+part.size-1}/${blob.size}`,"Content-Type":"application/octet-stream"},body:part});
+  if(!r.ok&&r.status!==202&&r.status!==201&&r.status!==200)throw new Error("upload "+r.status);pos+=part.size}}
+async function sendReportMail(id){const Pp=aptById(id);const a=A(id);const files=await makeReportFiles(id);
+ const msg={subject:mailSubject(Pp,a),body:{contentType:"HTML",content:mailBody(Pp,a)},toRecipients:MAILTO.map(([n,e])=>({emailAddress:{name:n,address:e}}))};
+ let r=await gr("/me/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(msg)},SY.mail);if(!r.ok)throw new Error("draft "+r.status);const m=await r.json();
+ for(const f of files){if(f.blob.size<2.8*1024*1024){const buf=await f.blob.arrayBuffer();r=await gr(`/me/messages/${m.id}/attachments`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({"@odata.type":"#microsoft.graph.fileAttachment",name:f.name,contentType:f.type,contentBytes:b64(buf)})},SY.mail);if(!r.ok)throw new Error("attach "+r.status)}
+  else{r=await gr(`/me/messages/${m.id}/attachments/createUploadSession`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({AttachmentItem:{attachmentType:"file",name:f.name,size:f.blob.size,contentType:f.type}})},SY.mail);if(!r.ok)throw new Error("session "+r.status);const us=await r.json();await gUploadSession(us.uploadUrl,f.blob,false)}}
+ r=await gr(`/me/messages/${m.id}/send`,{method:"POST"},SY.mail);if(!r.ok&&r.status!==202)throw new Error("send "+r.status);
+ /* copy of the PDF in OneDrive: Inspection reports\HUS B\Signed reports */
+ try{const f=files[0];const path=`/me/drive/root:/${gEnc(SY.reports+"/"+f.name)}:`;
+  if(f.blob.size<3.9*1024*1024)await gr(path+"/content",{method:"PUT",headers:{"Content-Type":"application/pdf"},body:f.blob});
+  else{const ss=await gr(path+"/createUploadSession",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:{"@microsoft.graph.conflictBehavior":"replace"}})});if(ss.ok){const u=await ss.json();await gUploadSession(u.uploadUrl,f.blob,true)}}}catch(e){console.error("report copy",e)}
+ a.sentAt=Date.now();a.sentRev=a.rev||0;a.sentTo=MAILTO.map(x=>x[1]);a.mailQueued=null;saveState()}
+let mailBusy=false;
+async function trySend(id,fromQueue){if(mailBusy)return;const a=A(id);if(!navigator.onLine){a.mailQueued=Date.now();saveState();toast("No signal – the e-mail goes out by itself when there is signal");render();return}
+ mailBusy=true;if(!fromQueue)toast("Sending the e-mail…");try{await sendReportMail(id);toast(`E-mail sent to ${MAILTO.length} people ✓`)}
+ catch(e){console.error("mail",e);const need=e&&(e.name==="InteractionRequiredAuthError"||/consent|interaction/i.test(String(e.errorCode||e.message||"")));
+  if(need){a.mailQueued=null;saveState();toast("Allow the app to send e-mail – one time");try{sessionStorage.setItem("mailAfterLogin",id);await sy.app.acquireTokenRedirect({scopes:SY.mail,account:sy.acct})}catch(x){}}
+  else{a.mailQueued=Date.now();saveState();toast("Not sent yet – it will be tried again when the app syncs")}}
+ finally{mailBusy=false;render()}}
+async function sendQueuedMail(){for(const id of Object.keys(S().apts)){const a=S().apts[id];if(a.mailQueued&&isSigned(a)&&!mailBusy){await trySend(id,true)}}}
+function viewMail(id){const Pp=aptById(id);const a=A(id);curApt=id;curRoom="__mail";header("Send report · LGH "+Pp.lgh,"a-"+id,null);
+ const conn=!!(sy.acct&&window.msal);const sent=a.sentAt&&(a.sentRev||0)===(a.rev||0);
+ let h=`<p class="sub">${sent?`Sent ${dtF(a.sentAt)} to the list below.`:"The signed report goes from your Outlook to:"}</p>
+ <div class="sys">${MAILTO.map(([n,e])=>`<div><span>${esc(n)}</span><b style="color:var(--muted);font-weight:500">${esc(e)}</b></div>`).join("")}</div>
+ <div class="field" style="margin-top:14px"><label>Subject</label><div class="box" style="padding:10px 12px"><b>${esc(mailSubject(Pp,a))}</b></div></div>
+ <p class="hint">Attached: the signed PDF (plan, checklist, defects, water damage, photos, signatures) and the CSV. A copy of the PDF is saved in OneDrive – Inspection reports\\HUS B\\Signed reports.</p>
+ ${a.mailQueued?`<div class="box warn"><b>Waiting for signal</b><span>The e-mail goes out by itself when the phone has signal.</span></div>`:""}
+ ${conn?"":`<div class="box warn"><b>Connect OneDrive first</b><span>The e-mail is sent from your Microsoft account – go to the start screen and tap Connect OneDrive.</span></div>`}
+ <button class="btn wide" id="other" style="margin-top:12px">Other ways (WhatsApp, download…)</button>`;
+ $app.innerHTML=h;
+ dock(`<div class="info"><b>${MAILTO.length} recipients</b>${sent?"Already sent – send again if needed":"PDF + CSV"}</div><button class="btn go" id="sendm"${conn?"":" disabled"}>${sent?"Send again":"Send e-mail"}</button>`);
+ document.getElementById("other").onclick=()=>shareReport(id);const b=document.getElementById("sendm");if(b)b.onclick=()=>trySend(id)}
 function render(){const y=window.scrollY;route();window.scrollTo(0,y)}
 function route(){if(!$sheet.hidden&&C)return;const h=location.hash.slice(1);let m;
  if(!S().me||h==="me"){viewSetup();return}
@@ -1017,12 +1092,15 @@ function route(){if(!$sheet.hidden&&C)return;const h=location.hash.slice(1);let 
  if((m=h.match(/^a-(\d{4}-\d{4}[we]?)$/))&&aptById(m[1])){viewApt(m[1]);return}
  if((m=h.match(/^n-(\d{4}-\d{4}[we]?)$/))&&aptById(m[1])){viewRound2(m[1]);return}
  if((m=h.match(/^s-(\d{4}-\d{4}[we]?)$/))&&aptById(m[1])){viewSign(m[1]);return}
+ if((m=h.match(/^m-(\d{4}-\d{4}[we]?)$/))&&aptById(m[1])){viewMail(m[1]);return}
  if(h==="sum"){viewSum();return}
  viewHome()}
 window.addEventListener("hashchange",()=>{if(!$sheet.hidden){$sheet.hidden=true;$sheet.innerHTML="";C=null}route();window.scrollTo(0,0)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&curApt)reqWake()});
 (async function boot(){await openDB();const kv=await getAll("kv");mem.state=kv.state||{me:null,apts:{}};
  try{const ids=Object.keys(mem.state.apts||{}).filter(id=>clvOf(id)===1);if(ids.length){if(!kv.stateBeforeV2)await put("kv","stateBeforeV2",JSON.parse(JSON.stringify(mem.state)));let n=0;ids.forEach(id=>{if(migrateToV2(id))n++});if(n){saveState();setTimeout(()=>toast(n+" apartment"+(n>1?"s":"")+" moved to the new checklist – all records kept"),900)}}}catch(e){console.error("migration",e)}
+ try{let ch=0;Object.keys(mem.state.apts||{}).forEach(id=>{const a=mem.state.apts[id];if(clvOf(id)!==2||(a.clr||1)>=2)return;useApt(id);
+   if(isSigned(a))ROOMS.forEach(R=>R.items.forEach((it,i)=>{if(it[0]==="Water damage"&&itemState(a,R.k,i)==="todo")a.na[R.k+":"+i]="New item: water damage"}));a.clr=2;ch++});if(ch)saveState()}catch(e){console.error("clr",e)}
  const ph=await getAll("photos");Object.assign(mem.photos,ph);markMt();
  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
  if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});
