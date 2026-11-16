@@ -260,6 +260,7 @@ td.h2{background:var(--nok);color:var(--surface);font-weight:700}
 <script src="lib/jspdf.umd.min.js"></script>
 <script src="lib/jspdf.plugin.autotable.min.js"></script>
 <script src="lib/xlsx.full.min.js"></script>
+<script src="lib/msal-browser.min.js"></script>
 <script>
 (function(){
 "use strict";
@@ -458,7 +459,9 @@ function put(store,key,val){if(store==="photos")mem.photos[key]=val;if(!idb)retu
 function del(store,key){if(store==="photos"){delete mem.photos[key];if(urlCache[key]){URL.revokeObjectURL(urlCache[key]);delete urlCache[key]}}if(!idb)return Promise.resolve();return new Promise(res=>{try{const t=idb.transaction(store,"readwrite");t.objectStore(store).delete(key);t.oncomplete=()=>res();t.onerror=()=>res()}catch(e){res()}})}
 function getAll(store){if(!idb)return Promise.resolve({});return new Promise(res=>{const out={};try{const t=idb.transaction(store,"readonly");const rq=t.objectStore(store).openCursor();rq.onsuccess=()=>{const c=rq.result;if(c){out[c.key]=c.value;c.continue()}else res(out)};rq.onerror=()=>res(out)}catch(e){res(out)}})}
 const S=()=>mem.state;
-const saveState=()=>put("kv","state",JSON.parse(JSON.stringify(mem.state)));
+/* lh = last content seen per apartment; when it changes the apartment gets a new modification time (used to merge copies from two devices) */
+const lh={};const markMt=()=>{const st=mem.state;Object.keys(st.apts||{}).forEach(id=>{const h=hashOf(st.apts[id],1);if(lh[id]!==undefined&&lh[id]!==h)st.apts[id].mt=Date.now();lh[id]=hashOf(st.apts[id],1)})};
+const saveState=()=>{markMt();const p=put("kv","state",JSON.parse(JSON.stringify(mem.state)));try{schedSync()}catch(e){}return p};
 const urlCache={};function photoURL(id){if(!id)return "";if(urlCache[id])return urlCache[id];const b=mem.photos[id];if(!b)return "";urlCache[id]=URL.createObjectURL(b);return urlCache[id]}
 
 /* ===== helpers ===== */
@@ -561,6 +564,7 @@ function viewSetup(){header("Who is recording?",S().me?"home":null);dock(null);c
 
 function viewHome(){curApt=null;curRoom=null;header("HUS B",null,["Statistics",()=>{location.hash="sum"}]);dock(null);const st=S();
  let h=`<div class="row" style="justify-content:space-between;margin-bottom:6px"><p class="sub" style="margin:0">Recording as <b>${esc(st.me.name)}</b> (${esc(st.me.company)})</p><button class="btn" id="chg" style="min-height:38px;padding:6px 12px">Change</button></div>`;
+ h+=`<div id="syncbox" class="row" style="margin:2px 0 6px">${syncLabel()}</div>`;
  const plans=[...new Set(APTS.map(x=>x.plan))];h+=`<div class="fchips" style="margin:8px 0">${plans.map(pl=>`<button class="chip" data-jump="${pl}">Plan ${pl}</button>`).join("")}</div>`;
  plans.forEach(pl=>{const ap=APTS.filter(x=>x.plan===pl);const dn=ap.filter(x=>isSigned(A(x.id))||(V1_SIGNED[x.id]&&!A(x.id).startedAt)).length;
  h+=`<h2 class="floorh" id="f${pl}">Plan ${pl} <span class="muted">· ${dn}/${ap.length} apartments signed</span></h2><div class="list">`;
@@ -570,7 +574,7 @@ function viewHome(){curApt=null;curRoom=null;header("HUS B",null,["Statistics",(
    <span class="bar"><i style="width:${Math.round(100*rc/ROOMS.length)}%"></i></span><span class="pills">${state}${n?`<span class="pill nok">${n} defect${n>1?"s":""}</span>`:""}${naOpen(a).length?`<span class="pill warn">${naOpen(a).length} N/A</span>`:""}</span></button>`});
  h+=`</div>`});
  $app.innerHTML=h;
- document.getElementById("chg").onclick=()=>{location.hash="me"};
+ document.getElementById("chg").onclick=()=>{location.hash="me"};syncWire();
  $app.querySelectorAll("[data-jump]").forEach(b=>b.onclick=()=>{const e=document.getElementById("f"+b.dataset.jump);if(e)e.scrollIntoView({block:"start"})});
 }
 
@@ -939,6 +943,73 @@ async function shareReport(id){if(sharing)return;const Pp=aptById(id);const a=A(
  saveBlob(pdf,f1.name);setTimeout(()=>saveBlob(csv,f2.name),700);toast("Report saved to Downloads – send it from there");done()}
 
 /* ===== router ===== */
+/* ===== OneDrive sync (Microsoft 365, app "Herakles Joint Inspection" in the Mercury tenant) =====
+   every apartment is one JSON file and every photo one JPG in OneDrive: TLC PROJECTS/HERAKLES/Inspection app/data
+   the phone keeps working without signal; changes are sent when there is signal, and other devices pick them up */
+const SY={clientId:"9c35223e-193b-47f3-bae1-cac6155c5262",tenant:"77c3de7b-4cbc-4df1-a204-83c9a1b8da4b",root:"TLC PROJECTS/HERAKLES/Inspection app/data",scopes:["Files.ReadWrite","User.Read"]};
+const sy={app:null,acct:null,meta:{etag:{},hash:{},up:{},dev:null},status:"off",msg:"",busy:false,again:false,t:null,last:0,err:""};
+const gEnc=p=>p.split("/").map(encodeURIComponent).join("/");
+function hashOf(o,noMt){const s=JSON.stringify(o,(k,v)=>k==="v1"||(noMt&&k==="mt")?undefined:v);let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)+":"+s.length}
+const syDirty=id=>!!S().apts[id]&&hashOf(S().apts[id])!==sy.meta.hash[id];
+function syncLabel(){if(!window.msal)return "";const n=Object.keys(S().apts).filter(syDirty).length;
+ if(sy.status==="off")return `<button class="btn" id="syncOn" style="min-height:38px;padding:6px 12px">Connect OneDrive</button>`;
+ if(sy.status==="login")return `<button class="btn" id="syncOn" style="min-height:38px;padding:6px 12px">Reconnect OneDrive</button>`;
+ const txt=sy.status==="busy"?"OneDrive: syncing…":sy.status==="offline"?`OneDrive: no signal${n?` · ${n} change${n>1?"s":""} waiting`:""}`:sy.status==="error"?`OneDrive: not synced${n?` · ${n} waiting`:""} – tap to retry`:`OneDrive ✓ synced ${clock(sy.last)}`;
+ return `<button class="chip" id="syncNow" style="min-height:36px">${esc(txt)}</button>`}
+function syncPaint(){const el=document.getElementById("syncbox");if(el){el.innerHTML=syncLabel();syncWire()}}
+function syncWire(){const on=document.getElementById("syncOn");if(on)on.onclick=()=>{try{sy.app.loginRedirect({scopes:SY.scopes,prompt:"select_account"})}catch(e){toast("Could not open the Microsoft sign-in")}};
+ const nw=document.getElementById("syncNow");if(nw)nw.onclick=()=>{if(sy.status==="error"&&sy.err)toast(sy.err);syncNow()}}
+function setSync(s,m){sy.status=s;if(m!==undefined)sy.err=m;syncPaint()}
+function schedSync(){if(!sy.acct)return;clearTimeout(sy.t);sy.t=setTimeout(syncNow,3000)}
+async function syToken(){try{const r=await sy.app.acquireTokenSilent({scopes:SY.scopes,account:sy.acct});return r.accessToken}catch(e){setSync("login");throw e}}
+async function gr(path,opt={}){const tk=await syToken();const r=await fetch("https://graph.microsoft.com/v1.0"+path,Object.assign({},opt,{headers:Object.assign({Authorization:"Bearer "+tk},opt.headers||{})}));return r}
+const pItem=rel=>`/me/drive/root:/${gEnc(SY.root+"/"+rel)}:`;
+async function syncInit(){if(!window.msal)return;try{
+ sy.app=new msal.PublicClientApplication({auth:{clientId:SY.clientId,authority:"https://login.microsoftonline.com/"+SY.tenant,redirectUri:location.origin+location.pathname.replace(/index\.html$/,""),navigateToLoginRequestUrl:false,OIDCOptions:{serverResponseType:"query",defaultScopes:["openid","profile","offline_access"]}},cache:{cacheLocation:"localStorage"}});
+ await sy.app.initialize();const r=await sy.app.handleRedirectPromise();if(r&&r.account)sy.app.setActiveAccount(r.account);
+ if(/[?&](code|error|state)=/.test(location.search))history.replaceState(null,"",location.pathname+location.hash);
+ sy.acct=sy.app.getActiveAccount()||sy.app.getAllAccounts()[0]||null;
+ const kv=await getAll("kv");if(kv.sync)sy.meta=Object.assign(sy.meta,kv.sync);if(!sy.meta.dev){sy.meta.dev=Math.random().toString(36).slice(2,8);saveMeta()}
+ if(sy.acct){setSync("ok");syncNow();setInterval(()=>{if(document.visibilityState==="visible")syncNow()},60000);window.addEventListener("online",()=>syncNow());
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncNow()})}
+ else setSync("off")}catch(e){console.error("sync init",e);setSync("off")}}
+const saveMeta=()=>put("kv","sync",JSON.parse(JSON.stringify(sy.meta)));
+/* merge two copies of the same apartment changed on two devices: keep everything recorded on either */
+function mergeApt(L,R){const lt=L.mt||0,rt=R.mt||0;const base=JSON.parse(JSON.stringify(lt>=rt?L:R)),oth=lt>=rt?R:L;
+ ["ok","na","r2ok"].forEach(f=>{base[f]=Object.assign({},oth[f]||{},base[f]||{})});
+ const ids=new Set((base.defects||[]).map(d=>d.id));(oth.defects||[]).forEach(d=>{if(!ids.has(d.id))base.defects.push(d)});
+ base.defects.forEach(d=>{const o=(oth.defects||[]).find(x=>x.id===d.id);if(o&&o.photos)d.photos=[...new Set([...(d.photos||[]),...o.photos])]});
+ if(oth.startedAt&&(!base.startedAt||oth.startedAt<base.startedAt))base.startedAt=oth.startedAt;
+ const sk=a=>a.signedAt?[(a.rev||0),a.signedAt]:[-1,0];const so=sk(oth),sb=sk(base);
+ if(so[0]>sb[0]||(so[0]===sb[0]&&so[1]>sb[1]))["signedAt","signs","rev","r2key","history","sentAt","endedAt"].forEach(f=>{if(oth[f]!==undefined)base[f]=JSON.parse(JSON.stringify(oth[f]))});
+ base.mt=Math.max(lt,rt);return base}
+async function pullAll(){const r=await gr(pItem("apts")+"/children?$select=id,name,eTag&$top=999");if(r.status===404)return 0;if(!r.ok)throw new Error("list "+r.status);
+ const js=await r.json();let n=0;
+ for(const f of js.value||[]){const id=f.name.replace(/\.json$/,"");if(!aptById(id)||sy.meta.etag[id]===f.eTag)continue;
+  const c=await gr(`/me/drive/items/${f.id}/content`);if(!c.ok)continue;const doc=await c.json();if(!doc||!doc.data)continue;
+  const st=S();const loc=st.apts[id];
+  if(!loc||!syDirty(id)){st.apts[id]=doc.data;sy.meta.hash[id]=hashOf(doc.data)}else st.apts[id]=mergeApt(loc,doc.data);lh[id]=hashOf(st.apts[id],1);
+  sy.meta.etag[id]=f.eTag;n++}
+ return n}
+async function pushOne(id){const a=S().apts[id];const body=JSON.stringify({app:"herakles-v2",v:1,id,savedAt:Date.now(),by:(S().me||{}).name||"",dev:sy.meta.dev,data:a});
+ const et=sy.meta.etag[id];const url=pItem("apts/"+id+".json")+"/content"+(et?"":"?@microsoft.graph.conflictBehavior=fail");
+ let r=await gr(url,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},et?{"If-Match":et}:{}),body});
+ if(r.status===409||r.status===412){const g=await gr(pItem("apts/"+id+".json"));if(g.ok){const it=await g.json();const c=await gr(`/me/drive/items/${it.id}/content`);if(c.ok){const doc=await c.json();if(doc&&doc.data){S().apts[id]=mergeApt(S().apts[id],doc.data);lh[id]=hashOf(S().apts[id],1)}}
+   const body2=JSON.stringify({app:"herakles-v2",v:1,id,savedAt:Date.now(),by:(S().me||{}).name||"",dev:sy.meta.dev,data:S().apts[id]});
+   r=await gr(pItem("apts/"+id+".json")+"/content",{method:"PUT",headers:{"Content-Type":"application/json","If-Match":it.eTag},body:body2})}}
+ if(!r.ok)throw new Error("save "+id+" "+r.status);const it=await r.json();sy.meta.etag[id]=it.eTag;sy.meta.hash[id]=hashOf(S().apts[id])}
+async function photosSync(){const st=S();const want=new Set();Object.values(st.apts).forEach(a=>(a.defects||[]).forEach(d=>(d.photos||(d.photo?[d.photo]:[])).forEach(p=>want.add(p))));
+ for(const p of want){if(mem.photos[p]&&!sy.meta.up[p]){const b=mem.photos[p];const r=await gr(pItem("photos/"+p+".jpg")+"/content",{method:"PUT",headers:{"Content-Type":b.type||"image/jpeg"},body:b});if(r.ok||r.status===409){sy.meta.up[p]=1}}
+  else if(!mem.photos[p]){const r=await gr(pItem("photos/"+p+".jpg")+"/content");if(r.ok){const b=await r.blob();await put("photos",p,b);sy.meta.up[p]=1}}}}
+async function backupOnce(){if(sy.meta.backedUp)return;const kv=await getAll("kv");const data={app:"herakles-v2",dev:sy.meta.dev,at:Date.now(),state:kv.state||null,stateBeforeV2:kv.stateBeforeV2||null};
+ const r=await gr(pItem(`backup/state-${new Date().toISOString().slice(0,10)}-${sy.meta.dev}.json`)+"/content",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){sy.meta.backedUp=Date.now()}}
+async function syncNow(){if(!sy.acct)return;if(sy.busy){sy.again=true;return}if(!navigator.onLine){setSync("offline");return}
+ sy.busy=true;setSync("busy");try{await backupOnce();const got=await pullAll();
+  const st=S();for(const id of Object.keys(st.apts)){const a=st.apts[id];if(!a.startedAt&&!a.signedAt&&!(a.defects||[]).length&&!Object.keys(a.ok||{}).length&&!Object.keys(a.na||{}).length)continue;if(syDirty(id))await pushOne(id)}
+  await photosSync();await put("kv","state",JSON.parse(JSON.stringify(mem.state)));await saveMeta();sy.last=Date.now();setSync("ok","");
+  if(got&&$sheet.hidden)render()}
+ catch(e){console.error("sync",e);if(sy.status!=="login")setSync(navigator.onLine?"error":"offline",String(e&&e.message||e))}
+ finally{sy.busy=false;if(sy.again){sy.again=false;schedSync()}}}
 function render(){const y=window.scrollY;route();window.scrollTo(0,y)}
 function route(){if(!$sheet.hidden&&C)return;const h=location.hash.slice(1);let m;
  if(!S().me||h==="me"){viewSetup();return}
@@ -952,10 +1023,10 @@ window.addEventListener("hashchange",()=>{if(!$sheet.hidden){$sheet.hidden=true;
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&curApt)reqWake()});
 (async function boot(){await openDB();const kv=await getAll("kv");mem.state=kv.state||{me:null,apts:{}};
  try{const ids=Object.keys(mem.state.apts||{}).filter(id=>clvOf(id)===1);if(ids.length){if(!kv.stateBeforeV2)await put("kv","stateBeforeV2",JSON.parse(JSON.stringify(mem.state)));let n=0;ids.forEach(id=>{if(migrateToV2(id))n++});if(n){saveState();setTimeout(()=>toast(n+" apartment"+(n>1?"s":"")+" moved to the new checklist – all records kept"),900)}}}catch(e){console.error("migration",e)}
- const ph=await getAll("photos");Object.assign(mem.photos,ph);
+ const ph=await getAll("photos");Object.assign(mem.photos,ph);markMt();
  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
  if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});
- route()})();
+ route();syncInit()})();
 })();
 </script>
 </body>
