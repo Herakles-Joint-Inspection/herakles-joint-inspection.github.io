@@ -1169,7 +1169,8 @@ async function importRootV1(kv){const done=(kv&&kv.v1import)||{ids:[]};const d=a
   return n}finally{try{d.close()}catch(e){}}}
 (async function boot(){await openDB();const kv=await getAll("kv");mem.state=kv.state||{me:null,apts:{}};
  try{Object.keys(mem.state.apts||{}).forEach(id=>{const a=mem.state.apts[id];if(a&&a.clv===2&&v1Shape(id,a))a.clv=1})}catch(e){console.error("v1shape",e)}
- try{await importRootV1(kv)}catch(e){console.error("v1 import",e)}
+ /* the 6 inspections of 3–4 Nov (first app) were brought in from the signed PDFs on 17 Nov and live in OneDrive like every other record;
+    importRootV1 (same-phone database import) is kept for reference but not run, so the records are never created twice */
  try{const ids=Object.keys(mem.state.apts||{}).filter(id=>clvOf(id)===1);if(ids.length){if(!kv.stateBeforeV2)await put("kv","stateBeforeV2",JSON.parse(JSON.stringify(mem.state)));let n=0;ids.forEach(id=>{if(migrateToV2(id))n++});if(n){saveState();setTimeout(()=>toast(n+" apartment"+(n>1?"s":"")+" moved to the new checklist – all records kept"),900)}}}catch(e){console.error("migration",e)}
  try{let ch=0;Object.keys(mem.state.apts||{}).forEach(id=>{const a=mem.state.apts[id];if(clvOf(id)!==2||(a.clr||1)>=2)return;useApt(id);
    if(isSigned(a))ROOMS.forEach(R=>R.items.forEach((it,i)=>{if(it[0]==="Water damage"&&itemState(a,R.k,i)==="todo")a.na[R.k+":"+i]="New item: water damage"}));a.clr=2;ch++});if(ch)saveState()}catch(e){console.error("clr",e)}
