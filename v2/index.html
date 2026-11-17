@@ -570,6 +570,8 @@ function viewSetup(){header("Who is recording?",S().me?"home":null);dock(null);c
 function viewHome(){curApt=null;curRoom=null;header("HUS B",null,["Statistics",()=>{location.hash="sum"}]);dock(null);const st=S();
  let h=`<div class="row" style="justify-content:space-between;margin-bottom:6px"><p class="sub" style="margin:0">Recording as <b>${esc(st.me.name)}</b> (${esc(st.me.company)})</p><button class="btn" id="chg" style="min-height:38px;padding:6px 12px">Change</button></div>`;
  h+=`<div id="syncbox" class="row" style="margin:2px 0 6px">${syncLabel()}</div>`;
+ const todo=APTS.filter(x=>{const a=st.apts[x.id];return a&&a.mailTodo&&isSigned(a)&&!mailSent(a)});
+ if(todo.length)h+=`<div class="box warn" style="margin:6px 0"><b>Reports not e-mailed yet</b><div class="fchips" style="margin-top:6px">${todo.map(x=>`<a class="chip" href="#m-${x.id}">LGH ${esc(x.lgh)}</a>`).join("")}</div></div>`;
  const plans=[...new Set(APTS.map(x=>x.plan))];h+=`<div class="fchips" style="margin:8px 0">${plans.map(pl=>`<button class="chip" data-jump="${pl}">Plan ${pl}</button>`).join("")}</div>`;
  plans.forEach(pl=>{const ap=APTS.filter(x=>x.plan===pl);const dn=ap.filter(x=>isSigned(A(x.id))||(V1_SIGNED[x.id]&&!A(x.id).startedAt)).length;
  h+=`<h2 class="floorh" id="f${pl}">Plan ${pl} <span class="muted">· ${dn}/${ap.length} apartments signed</span></h2><div class="list">`;
@@ -1033,7 +1035,7 @@ async function photosSync(){const st=S();const want=new Set();Object.values(st.a
 async function backupOnce(){if(sy.meta.backedUp)return;const kv=await getAll("kv");const data={app:"herakles-v2",dev:sy.meta.dev,at:Date.now(),state:kv.state||null,stateBeforeV2:kv.stateBeforeV2||null};
  const r=await gr(pItem(`backup/state-${new Date().toISOString().slice(0,10)}-${sy.meta.dev}.json`)+"/content",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){sy.meta.backedUp=Date.now()}}
 async function syncNow(){if(!sy.acct)return;if(sy.busy){sy.again=true;return}if(!navigator.onLine){setSync("offline");return}
- sy.busy=true;setSync("busy");try{await backupOnce();const got=await pullAll();
+ sy.busy=true;setSync("busy");try{await backupOnce();const got=await pullAll();fixMailFlags();
   const st=S();for(const id of Object.keys(st.apts)){const a=st.apts[id];if(!a.startedAt&&!a.signedAt&&!(a.defects||[]).length&&!Object.keys(a.ok||{}).length&&!Object.keys(a.na||{}).length)continue;if(syDirty(id))await pushOne(id)}
   await photosSync();await put("kv","state",JSON.parse(JSON.stringify(mem.state)));await saveMeta();sy.last=Date.now();setSync("ok","");
   setTimeout(sendQueuedMail,500);
@@ -1044,46 +1046,57 @@ async function syncNow(){if(!sy.acct)return;if(sy.busy){sy.again=true;return}if(
 /* ===== send the signed report by e-mail from the recorder's Outlook (Microsoft Graph, Mail.Send) ===== */
 const modsTxt=m=>String(m||"").replace(/\s*\(.*\)\s*/,"").split("+").map(x=>x.trim()).filter(Boolean);
 function mailSubject(Pp,a){const ms=modsTxt(Pp.mods);return `HusB - Plan ${Pp.plan} - Ap ${Pp.lgh} (${ms.length>1?"Modules":"Module"} ${ms.join(" + ")})${a.rev?" - Rev "+a.rev:""}`}
-function mailBody(Pp,a){const st=aptStat(a);const sg=a.signs||{};const me=(S().me||{}).name||"";const ms=modsTxt(Pp.mods);const wd=wdDefs(a).length;
+function mailBody(Pp,a,link){const st=aptStat(a);const sg=a.signs||{};const me=(S().me||{}).name||"";const ms=modsTxt(Pp.mods);const wd=wdDefs(a).length;
  return `<p>Hi all,</p><p>Please find attached the signed joint inspection report${a.rev?` (revision ${a.rev})`:""} for HUS B, plan ${Pp.plan}, apartment ${esc(Pp.lgh)} (${ms.length>1?"modules":"module"} ${ms.join(" + ")}), TYP ${esc(Pp.typ)}.</p>
  <p>Signed by ${esc(sg.rec?sg.rec.name+" ("+sg.rec.company+")":"")} and ${esc(sg.other?sg.other.name+" ("+sg.other.company+")":"")} on ${dtF(a.signedAt)}.<br>Result: ${st.ok} items OK · ${st.defs} defect${st.defs===1?"":"s"}${wd?` (${wd} water damage)`:""} · ${st.na} not able to inspect${st.na?" (2nd round)":""}.</p>
- <p>PDF = signed report with plan, defect list and photos · CSV = all points and defects (opens in Excel).</p><p>Best regards,<br>${esc(me)}</p>`}
+ ${link?`<p>The signed PDF is too large to attach – open it here: <a href="${link}">${esc(fileBase(Pp,a))}.pdf</a><br>CSV attached = all points and defects (opens in Excel).</p>`:`<p>PDF = signed report with plan, defect list and photos · CSV = all points and defects (opens in Excel).</p>`}<p>Best regards,<br>${esc(me)}</p>`}
 const b64=buf=>{let s="";const u=new Uint8Array(buf);for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)};
 async function makeReportFiles(id){const Pp=aptById(id);const a=A(id);const pdf=await buildPDF(id);const csv=new Blob([toCSV(aptRows(Pp))],{type:"text/csv"});const base=fileBase(Pp,a);
  return [{name:base+".pdf",type:"application/pdf",blob:pdf},{name:base+".csv",type:"text/csv",blob:csv}]}
-async function gUploadSession(url,blob,driveStyle){const CH=driveStyle?327680*12:3*1024*1024;let pos=0;
+async function gUploadSession(url,blob,driveStyle){const CH=driveStyle?327680*12:3*1024*1024;let pos=0,last=null;
  while(pos<blob.size){const part=blob.slice(pos,Math.min(blob.size,pos+CH));const r=await fetch(url,{method:"PUT",headers:{"Content-Range":`bytes ${pos}-${pos+part.size-1}/${blob.size}`,"Content-Type":"application/octet-stream"},body:part});
-  if(!r.ok&&r.status!==202&&r.status!==201&&r.status!==200)throw new Error("upload "+r.status);pos+=part.size}}
+  if(!r.ok&&r.status!==202&&r.status!==201&&r.status!==200)throw new Error("upload "+r.status);pos+=part.size;if(r.status===200||r.status===201){try{last=await r.json()}catch(e){}}}return last}
+async function grErr(r,what){let m="";try{const j=await r.json();m=j.error?(j.error.code+": "+j.error.message):""}catch(e){}return new Error(what+" "+r.status+(m?" – "+m:""))}
+async function driveCopy(f){const path=`/me/drive/root:/${gEnc(SY.reports+"/"+f.name)}:`;
+ if(f.blob.size<3.9*1024*1024){const r=await gr(path+"/content",{method:"PUT",headers:{"Content-Type":f.type},body:f.blob});return r.ok?await r.json():null}
+ const ss=await gr(path+"/createUploadSession",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:{"@microsoft.graph.conflictBehavior":"replace"}})});if(!ss.ok)return null;const u=await ss.json();return await gUploadSession(u.uploadUrl,f.blob,true)}
+async function shareLink(it){for(const scope of ["anonymous","organization"]){try{const r=await gr(`/me/drive/items/${it.id}/createLink`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"view",scope})});if(r.ok){const j=await r.json();if(j.link&&j.link.webUrl)return j.link.webUrl}}catch(e){}}return null}
+/* Mail.Send allows /me/sendMail only (no drafts) – attachments go inline; a PDF too large to attach goes as a OneDrive link */
 async function sendReportMail(id){const Pp=aptById(id);const a=A(id);const files=await makeReportFiles(id);
- const msg={subject:mailSubject(Pp,a),body:{contentType:"HTML",content:mailBody(Pp,a)},toRecipients:MAILTO.map(([n,e])=>({emailAddress:{name:n,address:e}}))};
- let r=await gr("/me/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(msg)},SY.mail);if(!r.ok)throw new Error("draft "+r.status);const m=await r.json();
- for(const f of files){if(f.blob.size<2.8*1024*1024){const buf=await f.blob.arrayBuffer();r=await gr(`/me/messages/${m.id}/attachments`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({"@odata.type":"#microsoft.graph.fileAttachment",name:f.name,contentType:f.type,contentBytes:b64(buf)})},SY.mail);if(!r.ok)throw new Error("attach "+r.status)}
-  else{r=await gr(`/me/messages/${m.id}/attachments/createUploadSession`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({AttachmentItem:{attachmentType:"file",name:f.name,size:f.blob.size,contentType:f.type}})},SY.mail);if(!r.ok)throw new Error("session "+r.status);const us=await r.json();await gUploadSession(us.uploadUrl,f.blob,false)}}
- r=await gr(`/me/messages/${m.id}/send`,{method:"POST"},SY.mail);if(!r.ok&&r.status!==202)throw new Error("send "+r.status);
- /* copy of the PDF in OneDrive: Inspection reports\HUS B\Signed reports */
- try{const f=files[0];const path=`/me/drive/root:/${gEnc(SY.reports+"/"+f.name)}:`;
-  if(f.blob.size<3.9*1024*1024)await gr(path+"/content",{method:"PUT",headers:{"Content-Type":"application/pdf"},body:f.blob});
-  else{const ss=await gr(path+"/createUploadSession",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:{"@microsoft.graph.conflictBehavior":"replace"}})});if(ss.ok){const u=await ss.json();await gUploadSession(u.uploadUrl,f.blob,true)}}}catch(e){console.error("report copy",e)}
- a.sentAt=Date.now();a.sentRev=a.rev||0;a.sentTo=MAILTO.map(x=>x[1]);a.mailQueued=null;saveState()}
-let mailBusy=false;
-async function trySend(id,fromQueue){if(mailBusy)return;const a=A(id);if(!navigator.onLine){a.mailQueued=Date.now();saveState();toast("No signal – the e-mail goes out by itself when there is signal");render();return}
- mailBusy=true;if(!fromQueue)toast("Sending the e-mail…");try{await sendReportMail(id);toast(`E-mail sent to ${MAILTO.length} people ✓`)}
- catch(e){console.error("mail",e);const need=e&&(e.name==="InteractionRequiredAuthError"||/consent|interaction/i.test(String(e.errorCode||e.message||"")));
-  if(need){a.mailQueued=null;saveState();toast("Allow the app to send e-mail – one time");try{sessionStorage.setItem("mailAfterLogin",id);await sy.app.acquireTokenRedirect({scopes:SY.mail,account:sy.acct})}catch(x){}}
-  else{a.mailQueued=Date.now();saveState();toast("Not sent yet – it will be tried again when the app syncs")}}
+ let it=null;try{it=await driveCopy(files[0])}catch(e){console.error("report copy",e)}
+ const big=files.reduce((t,f)=>t+f.blob.size,0)>2.9*1024*1024;let link=null;
+ if(big){if(!it)throw new Error("The PDF is too large to attach and could not be saved in OneDrive");link=await shareLink(it);if(!link)throw new Error("The PDF is too large to attach and no OneDrive link could be made")}
+ const att=[];for(const f of (big?files.slice(1):files))att.push({"@odata.type":"#microsoft.graph.fileAttachment",name:f.name,contentType:f.type,contentBytes:b64(await f.blob.arrayBuffer())});
+ const msg={subject:mailSubject(Pp,a),body:{contentType:"HTML",content:mailBody(Pp,a,link)},toRecipients:MAILTO.map(([n,e])=>({emailAddress:{name:n,address:e}})),attachments:att};
+ const r=await gr("/me/sendMail",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg,saveToSentItems:true})},SY.mail);
+ if(!r.ok&&r.status!==202)throw await grErr(r,"send");
+ a.sentAt=Date.now();a.sentRev=a.rev||0;a.sentTo=MAILTO.map(x=>x[1]);delete a.mailTodo;delete a.mailQueued;saveState()}
+let mailBusy=false;const mailErr={};
+const mq=()=>sy.meta.mq||(sy.meta.mq={});
+const mailSent=a=>!!(a.sentAt&&(a.sentRev||0)===(a.rev||0));
+/* the waiting list is kept on this phone only (never synced), so two devices never send the same report */
+function fixMailFlags(){let ch=0;Object.values(S().apts||{}).forEach(a=>{if(a.mailQueued!==undefined){if(a.mailQueued&&!mailSent(a))a.mailTodo=1;delete a.mailQueued;ch++}});return ch}
+async function trySend(id,fromQueue){if(mailBusy)return;const a=A(id);if(!sy.acct){toast("Connect OneDrive first");return}
+ if(!navigator.onLine){mq()[id]=Date.now();a.mailTodo=1;saveMeta();saveState();delete mailErr[id];toast("No signal – the e-mail goes out by itself when there is signal");render();return}
+ mailBusy=true;delete mailErr[id];if(!fromQueue){toast("Sending the e-mail…");render()}
+ try{await sendReportMail(id);delete mq()[id];saveMeta();toast(`E-mail sent to ${MAILTO.length} people ✓`)}
+ catch(e){console.error("mail",e);const txt=String(e&&(e.errorCode||e.message)||e);const need=e&&(e.name==="InteractionRequiredAuthError"||/consent|interaction|login_required/i.test(txt));
+  if(need){delete mq()[id];saveMeta();toast("Allow the app to send e-mail – one time");try{sessionStorage.setItem("mailAfterLogin",id);await sy.app.acquireTokenRedirect({scopes:SY.mail,account:sy.acct})}catch(x){}}
+  else if(!navigator.onLine||(/failed to fetch|network/i.test(txt)&&(mq()[id+"#n"]=(mq()[id+"#n"]||0)+1)<3)){mq()[id]=Date.now();a.mailTodo=1;saveMeta();saveState();toast("No signal – the e-mail goes out by itself when there is signal")}
+  else{delete mq()[id];delete mq()[id+"#n"];saveMeta();a.mailTodo=1;saveState();mailErr[id]=txt;toast("E-mail NOT sent – the reason is on the Send report screen")}}
  finally{mailBusy=false;render()}}
-async function sendQueuedMail(){for(const id of Object.keys(S().apts)){const a=S().apts[id];if(a.mailQueued&&isSigned(a)&&!mailBusy){await trySend(id,true)}}}
+async function sendQueuedMail(){if(!navigator.onLine||mailBusy)return;for(const id of Object.keys(mq())){if(id.includes("#"))continue;const a=S().apts[id];if(!a||!isSigned(a)||mailSent(a)){delete mq()[id];continue}await trySend(id,true);break}}
 function viewMail(id){const Pp=aptById(id);const a=A(id);curApt=id;curRoom="__mail";header("Send report · LGH "+Pp.lgh,"a-"+id,null);
- const conn=!!(sy.acct&&window.msal);const sent=a.sentAt&&(a.sentRev||0)===(a.rev||0);
+ const conn=!!(sy.acct&&window.msal);const sent=mailSent(a);
  let h=`<p class="sub">${sent?`Sent ${dtF(a.sentAt)} to the list below.`:"The signed report goes from your Outlook to:"}</p>
  <div class="sys">${MAILTO.map(([n,e])=>`<div><span>${esc(n)}</span><b style="color:var(--muted);font-weight:500">${esc(e)}</b></div>`).join("")}</div>
  <div class="field" style="margin-top:14px"><label>Subject</label><div class="box" style="padding:10px 12px"><b>${esc(mailSubject(Pp,a))}</b></div></div>
  <p class="hint">Attached: the signed PDF (plan, checklist, defects, water damage, photos, signatures) and the CSV. A copy of the PDF is saved in OneDrive – Inspection reports\\HUS B\\Signed reports.</p>
- ${a.mailQueued?`<div class="box warn"><b>Waiting for signal</b><span>The e-mail goes out by itself when the phone has signal.</span></div>`:""}
+ ${mailBusy?`<div class="box"><b>Sending…</b><span>Building the PDF and sending – keep the app open.</span></div>`:mailErr[id]?`<div class="box warn"><b>E-mail not sent</b><span>${esc(mailErr[id])}</span><span>Tap Send e-mail to try again, or use Other ways.</span></div>`:(sy.meta.mq||{})[id]?`<div class="box warn"><b>Waiting for signal</b><span>The e-mail goes out by itself when this phone has signal.</span></div>`:""}
  ${conn?"":`<div class="box warn"><b>Connect OneDrive first</b><span>The e-mail is sent from your Microsoft account – go to the start screen and tap Connect OneDrive.</span></div>`}
  <button class="btn wide" id="other" style="margin-top:12px">Other ways (WhatsApp, download…)</button>`;
  $app.innerHTML=h;
- dock(`<div class="info"><b>${MAILTO.length} recipients</b>${sent?"Already sent – send again if needed":"PDF + CSV"}</div><button class="btn go" id="sendm"${conn?"":" disabled"}>${sent?"Send again":"Send e-mail"}</button>`);
+ dock(`<div class="info"><b>${MAILTO.length} recipients</b>${sent?"Already sent – send again if needed":"PDF + CSV"}</div><button class="btn go" id="sendm"${conn&&!mailBusy?"":" disabled"}>${sent?"Send again":"Send e-mail"}</button>`);
  document.getElementById("other").onclick=()=>shareReport(id);const b=document.getElementById("sendm");if(b)b.onclick=()=>trySend(id)}
 function render(){const y=window.scrollY;route();window.scrollTo(0,y)}
 function route(){if(!$sheet.hidden&&C)return;const h=location.hash.slice(1);let m;
@@ -1101,6 +1114,7 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState===
  try{const ids=Object.keys(mem.state.apts||{}).filter(id=>clvOf(id)===1);if(ids.length){if(!kv.stateBeforeV2)await put("kv","stateBeforeV2",JSON.parse(JSON.stringify(mem.state)));let n=0;ids.forEach(id=>{if(migrateToV2(id))n++});if(n){saveState();setTimeout(()=>toast(n+" apartment"+(n>1?"s":"")+" moved to the new checklist – all records kept"),900)}}}catch(e){console.error("migration",e)}
  try{let ch=0;Object.keys(mem.state.apts||{}).forEach(id=>{const a=mem.state.apts[id];if(clvOf(id)!==2||(a.clr||1)>=2)return;useApt(id);
    if(isSigned(a))ROOMS.forEach(R=>R.items.forEach((it,i)=>{if(it[0]==="Water damage"&&itemState(a,R.k,i)==="todo")a.na[R.k+":"+i]="New item: water damage"}));a.clr=2;ch++});if(ch)saveState()}catch(e){console.error("clr",e)}
+ try{if(fixMailFlags())saveState()}catch(e){console.error("mailflags",e)}
  const ph=await getAll("photos");Object.assign(mem.photos,ph);markMt();
  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
  if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});
