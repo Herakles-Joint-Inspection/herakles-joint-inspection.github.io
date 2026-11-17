@@ -335,16 +335,18 @@ function roomsOfV2(ap){const bt=baseTyp(ap.typ);const key="v2|"+bt+"|"+ap.lay+"|
  Object.values(R).forEach(r=>r.items.push(["Water damage",WDMG]));
  const fh=sp.frd&&sp.frd.from==="hall";const order=["hall","bath",fh?"frd":"","kitchen","living","bed1",fh?"":"frd","bed2"];
  const rs=order.filter(k=>k&&R[k]).map(k=>R[k]);RCACHE[key]=rs;return rs}
-/* which checklist an apartment uses: v1 if it was started before v2 existed, otherwise v2 */
-/* r3 was live for about an hour on 16 Nov and then rolled back: an apartment marked v2 in that hour but recorded afterwards in the
-   old version holds v1 data – recognise it by the recorded item names / item numbers and treat it as v1 */
-const R3_BACK=Date.parse("2026-11-16T18:25:00Z");
-function v1Data(id,a){const ap=APTS.find(x=>x.id===id);if(!ap)return false;const o=roomsOfV1(ap),n=roomsOfV2(ap);const nm=(L,k,i)=>{const R=L.find(r=>r.k===k);return R&&R.items[i]?R.items[i][0]:null};
+/* which checklist an apartment uses: a.clv when stamped (2 = v2, set when the record is created or migrated); a record without
+   a stamp comes from r2 (v1 checklist) if it holds data, otherwise it is new and uses v2. No guessing from the data while recording:
+   the shape test below runs ONLY at boot and ONLY for records started before r4 went live on 16 Nov – everything started after
+   that was recorded with v2 */
+const R4_LIVE=Date.parse("2026-11-16T19:40:00Z");
+function v1Shape(id,a){if((a.startedAt||0)>R4_LIVE||a.migratedAt||a.importedV1)return false;const ap=APTS.find(x=>x.id===id);if(!ap)return false;const o=roomsOfV1(ap),n=roomsOfV2(ap);const nm=(L,k,i)=>{const R=L.find(r=>r.k===k);return R&&R.items[i]?R.items[i][0]:null};
  for(const d of a.defects||[]){if(d.i<0)continue;if(nm(n,d.room,d.i)===d.item)return false;if(nm(o,d.room,d.i)===d.item)return true}
  const keys=[...Object.keys(a.ok||{}),...Object.keys(a.na||{})];if(!keys.length)return false;
  for(const key of keys){const [k,i]=key.split(":");const R=o.find(r=>r.k===k);if(!R||+i>=R.items.length)return false}
- return (a.startedAt||0)>R3_BACK}
-function clvOf(id){const st=S();const a=st&&st.apts&&st.apts[id];if(a&&a.clv===2&&!a.migratedAt&&v1Data(id,a))a.clv=1;return a&&a.clv?a.clv:(a&&(a.startedAt||a.signedAt||a.defects&&a.defects.length||Object.keys(a.ok||{}).length||Object.keys(a.na||{}).length)?1:2)}
+ return true}
+const hasData=a=>!!(a&&(a.startedAt||a.signedAt||(a.defects&&a.defects.length)||Object.keys(a.ok||{}).length||Object.keys(a.na||{}).length));
+function clvOf(id){const st=S();const a=st&&st.apts&&st.apts[id];return a&&a.clv?a.clv:(hasData(a)?1:2)}
 /* move an apartment recorded with checklist v1 onto checklist v2 – every OK, N/A and defect is kept; items that are new in v2 are
    left to inspect (or, if the apartment is already signed, put on the 2nd-round list) */
 function migrateToV2(id){const st=S();const a=st.apts[id];const ap=APTS.find(x=>x.id===id);if(!a||!ap||clvOf(id)!==1)return false;
@@ -1123,7 +1125,51 @@ function route(){if(!$sheet.hidden&&C)return;const h=location.hash.slice(1);let 
  viewHome()}
 window.addEventListener("hashchange",()=>{if(!$sheet.hidden){$sheet.hidden=true;$sheet.innerHTML="";C=null}route();window.scrollTo(0,0)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&curApt)reqWake()});
+/* ===== one-time import of the first app (root, 3–4 Nov) – IndexedDB "herakles-inspection" on the same phone ===== */
+const V1ROOT={hall:["Entrance door","Wood floor","Skirting","Clothes hanger","Walls","Bathroom door (hall side)","FRD door"],
+ frd:["Skirting","Floor","Painting","Ceiling","Distribution board","Storage rack (if installed)"],
+ bath:["Floor tiles","Wall tiles","Ceiling & LK box","Sink","Tap","Mirror","Shower","Shower glass","Radiator","Toilet","Bathroom door","Threshold","Ventilation unit","Cabinet"],
+ kitchen:["Skirting","Floor","Control panel in the cabinet","Kitchen top","Backsplash","Furniture","Tap & sink","Dishwasher hole","Walls","Ceiling"],
+ living:["Window","Balcony door","Skirting","Floor","Walls","Ceiling","Radiators"],
+ bed1:["Bedroom 1 door","Window","Skirting","Floor","Walls","Ceiling","Radiators","Furniture"],
+ bed2:["Bedroom 2 door","Window","Skirting","Floor","Walls","Ceiling","Radiators","Furniture"],
+ shaft:["Pipe shaft","Fire seal around conduits"]};
+const V1ROOT_ALIAS={"Clothes hanger":"Clothes hanger / hat shelf","Painting":"Walls (painting)","Distribution board":"Distribution board (DB box)","Storage rack (if installed)":"Storage rack / shelves","Radiator":"Towel dryer"};
+function v1RootTarget(rooms,room,name){const R=rooms.find(r=>r.k===room);const find=(RR,f)=>{if(!RR)return null;const i=RR.items.findIndex(it=>f(it[0]));return i>=0?[RR.k,i]:null};
+ const al=V1ROOT_ALIAS[name];let t=find(R,x=>x===name)||(al&&find(R,x=>x===al));if(t)return t;
+ if(name==="FRD door")return find(rooms.find(r=>r.k==="frd"),x=>/^FRD (sliding )?doors?$/.test(x));
+ if(name==="Furniture"&&/^bed/.test(room))return find(R,x=>/wardrobe/i.test(x));
+ if(name==="Radiator"&&room==="bath")return find(R,x=>/towel|radiator/i.test(x));
+ for(const RR of rooms){t=find(RR,x=>x===name||x===al);if(t)return t}return null}
+function openRootV1DB(){return new Promise(res=>{try{if(!window.indexedDB)return res(null);const r=indexedDB.open("herakles-inspection");let fresh=false;
+ r.onupgradeneeded=()=>{fresh=true;try{r.transaction.abort()}catch(e){}};r.onsuccess=()=>{const d=r.result;if(fresh||!d.objectStoreNames.contains("insp")){try{d.close()}catch(e){}return res(null)}res(d)};r.onerror=()=>res(null);r.onblocked=()=>res(null)}catch(e){res(null)}})}
+const idbAll=(d,store,keys)=>new Promise(res=>{try{const tx=d.transaction(store,"readonly").objectStore(store);const r=keys?tx.getAllKeys():tx.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>res([])}catch(e){res([])}});
+const idbGet=(d,store,key)=>new Promise(res=>{try{const r=d.transaction(store,"readonly").objectStore(store).get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch(e){res(null)}});
+async function importRootV1(kv){const done=(kv&&kv.v1import)||{ids:[]};const d=await openRootV1DB();if(!d)return 0;
+ try{const keys=await idbAll(d,"insp",true),recs=await idbAll(d,"insp",false);let n=0;const got=[];
+  for(let x=0;x<keys.length;x++){const I=recs[x];if(!I||typeof I!=="object")continue;const vid=String(keys[x]);
+   const lines=I.lines||{};const used=Object.keys(lines).filter(k=>lines[k]&&lines[k].s);if(!used.length&&!I.signedAt)continue;
+   const [bq,bp]=vid.split("-");const ap=APTS.find(a=>{const m=modsTxt(a.mods);return m.includes(bq)&&(!bp||m.includes(bp))});if(!ap){console.warn("v1 import: no apartment for",vid);continue}
+   const cur=mem.state.apts[ap.id];if(cur&&(cur.importedV1||isSigned(cur)||(cur.defects||[]).length||Object.keys(cur.ok||{}).length||Object.keys(cur.na||{}).length))continue;
+   const rooms=roomsOfV2(ap);const rec=I.signs&&I.signs.rec,oth=I.signs&&I.signs.other;const by=rec?rec.name:"";
+   const a={clv:2,clr:2,startedAt:I.startedAt||I.signedAt||null,endedAt:I.signedAt||null,ok:{},na:{},r2ok:{},defects:[],importedV1:Date.now(),v1root:vid,
+    v1:{root:{apt:vid,lines:JSON.parse(JSON.stringify(lines)),startedAt:I.startedAt,signedAt:I.signedAt,sharedAt:I.sharedAt,signs:{rec:rec?{name:rec.name,company:rec.company,at:rec.at}:null,other:oth?{name:oth.name,company:oth.company,at:oth.at}:null}}}};
+   for(const k of used){const L=lines[k];const [room,ix]=k.split(":");const name=(V1ROOT[room]||[])[+ix-1];if(!name)continue;const t=v1RootTarget(rooms,room,name);
+    if(L.s==="ok"){if(t)a.ok[t[0]+":"+t[1]]=true;continue}
+    if(L.s==="na"){if(t)a.na[t[0]+":"+t[1]]=L.note||"";continue}
+    if(L.s!=="nok")continue;
+    const phs=[];for(const pid of (L.photos||[])){const b=await idbGet(d,"photos",pid);if(!b)continue;const nid="v1"+pid;if(!mem.photos[nid]){mem.photos[nid]=b;await put("photos",nid,b)}phs.push(nid)}
+    const walls=(L.walls||[]).filter(Boolean);const point=walls.length?walls.join("/"):(t?"":"(other item)");const tags=(L.tags||[]).length?L.tags:["Other"];
+    tags.forEach(tag=>{const item=t?rooms.find(r=>r.k===t[0]).items[t[1]][0]:name;a.defects.push({id:newId("d"),room:t?t[0]:(rooms.find(r=>r.k===room)?room:"hall"),i:t?t[1]:-1,j:-1,rnd:1,item,point,wall:walls[0]||"",issue:tag,cat:catOf(tag),sev:defaultSev(tag),trade:trade(item,point,tag),flag:!!L.flag,note:(L.note||"").trim()+(t?"":" (item from the first checklist)"),photos:phs.slice(),at:L.at||I.signedAt||Date.now(),by,v1:1})})}
+   if(I.signedAt&&rec&&oth){a.signs={rec:{name:rec.name,company:rec.company,sig:rec.sig,at:rec.at},other:{name:oth.name,company:oth.company,sig:oth.sig,at:oth.at}};a.signedAt=I.signedAt;a.rev=0;a.sentAt=I.sharedAt||I.signedAt;
+    a.history=[{rev:0,signedAt:I.signedAt,rec:{name:rec.name,company:rec.company,at:rec.at},other:{name:oth.name,company:oth.company,at:oth.at}}];
+    rooms.forEach(R=>R.items.forEach((_,i)=>{const key=R.k+":"+i;if(!a.ok[key]&&!(key in a.na)&&!a.defects.some(z=>z.room===R.k&&z.i===i))a.na[key]="New in checklist v2"}));a.r2key=r2Key(a)}
+   mem.state.apts[ap.id]=a;got.push(ap.id);n++}
+  if(n){await put("kv","v1import",{at:Date.now(),ids:done.ids.concat(got)});saveState();setTimeout(()=>toast(n+" apartment"+(n>1?"s":"")+" from the first app (3–4 Nov) brought into this app – all records kept"),1200)}
+  return n}finally{try{d.close()}catch(e){}}}
 (async function boot(){await openDB();const kv=await getAll("kv");mem.state=kv.state||{me:null,apts:{}};
+ try{Object.keys(mem.state.apts||{}).forEach(id=>{const a=mem.state.apts[id];if(a&&a.clv===2&&v1Shape(id,a))a.clv=1})}catch(e){console.error("v1shape",e)}
+ try{await importRootV1(kv)}catch(e){console.error("v1 import",e)}
  try{const ids=Object.keys(mem.state.apts||{}).filter(id=>clvOf(id)===1);if(ids.length){if(!kv.stateBeforeV2)await put("kv","stateBeforeV2",JSON.parse(JSON.stringify(mem.state)));let n=0;ids.forEach(id=>{if(migrateToV2(id))n++});if(n){saveState();setTimeout(()=>toast(n+" apartment"+(n>1?"s":"")+" moved to the new checklist – all records kept"),900)}}}catch(e){console.error("migration",e)}
  try{let ch=0;Object.keys(mem.state.apts||{}).forEach(id=>{const a=mem.state.apts[id];if(clvOf(id)!==2||(a.clr||1)>=2)return;useApt(id);
    if(isSigned(a))ROOMS.forEach(R=>R.items.forEach((it,i)=>{if(it[0]==="Water damage"&&itemState(a,R.k,i)==="todo")a.na[R.k+":"+i]="New item: water damage"}));a.clr=2;ch++});if(ch)saveState()}catch(e){console.error("clr",e)}
