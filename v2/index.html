@@ -887,7 +887,9 @@ const pdfTxt=s=>String(s==null?"":s).replace(/[–—]/g,"-").replace(/[‘’]/
 function blobToDataURL(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(b)})}
 function imgSize(u){return new Promise(res=>{const im=new Image();im.onload=()=>res([im.naturalWidth,im.naturalHeight]);im.onerror=()=>res([4,3]);im.src=u})}
 
-async function buildPDF(id){const {jsPDF}=window.jspdf;const Pp=aptById(id);const a=A(id);const st=aptStat(a);const T=pdfTxt;
+async function shrinkDU(du,max,q){const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=du});const k=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+ const c=document.createElement("canvas");c.width=Math.max(1,Math.round(img.naturalWidth*k));c.height=Math.max(1,Math.round(img.naturalHeight*k));const g=c.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);return c.toDataURL("image/jpeg",q)}
+async function buildPDF(id,opt){const {jsPDF}=window.jspdf;const Pp=aptById(id);const a=A(id);const st=aptStat(a);const T=pdfTxt;
  const doc=new jsPDF({unit:"mm",format:"a4"});const W=210,M=14;const defs=orderedDefs(a);const no={};defs.forEach((d,k)=>no[d.id]="D"+(k+1));
  const head=(t)=>{doc.setFillColor(31,95,168);doc.rect(0,0,W,24,"F");doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(9);doc.text("HERAKLES JOINT INSPECTION - HUS B",M,9);
   doc.setFontSize(15);doc.text(T(t),M,18);doc.setTextColor(23,32,42);doc.setFont("helvetica","normal")};
@@ -931,7 +933,7 @@ async function buildPDF(id){const {jsPDF}=window.jspdf;const Pp=aptById(id);cons
  /* photos – a photo shared by several defects is printed once */
  const phs=[];const seen={};defs.forEach(d=>(d.photos||[]).forEach(p=>{if(seen[p]){seen[p].cap=seen[p].cap.replace(/^(D\d+(?:, D\d+)*)/,"$1, "+no[d.id]);return}const o={p,cap:`${no[d.id]} · ${roomByK(d.room).name.replace(/ \(.*\)/,"")} · ${d.item}${d.point&&d.point.toLowerCase()!==d.item.toLowerCase()?" · "+d.point:""} · ${issueTxt(d)}`};seen[p]=o;phs.push(o)}));
  if(phs.length){doc.addPage();head(`LGH ${Pp.lgh} - photos`);let x=M,py=30,rowH=0;const cw=(W-2*M-6)/2;
-  for(const ph of phs){const b=mem.photos[ph.p];if(!b)continue;let du;try{du=await blobToDataURL(b)}catch(e){continue}const [iw,ih]=await imgSize(du);let w=cw,h=cw*ih/iw;if(h>100){h=100;w=h*iw/ih}
+  for(const ph of phs){const b=mem.photos[ph.p];if(!b)continue;let du;try{du=await blobToDataURL(b)}catch(e){continue}if(opt&&opt.max){try{const s2=await shrinkDU(du,opt.max,opt.q);if(s2.length<du.length)du=s2}catch(e){}}const [iw,ih]=await imgSize(du);let w=cw,h=cw*ih/iw;if(h>100){h=100;w=h*iw/ih}
    if(py+h+10>285){doc.addPage();head(`LGH ${Pp.lgh} - photos`);py=30;x=M;rowH=0}
    try{doc.addImage(du,du.startsWith("data:image/png")?"PNG":"JPEG",x,py,w,h)}catch(e){}doc.setFontSize(7.5);doc.text(doc.splitTextToSize(T(ph.cap),cw),x,py+h+3.5);rowH=Math.max(rowH,h+11);
    if(x===M)x=M+cw+6;else{x=M;py+=rowH;rowH=0}}}
@@ -974,7 +976,7 @@ async function shareReport(id){if(sharing)return;const Pp=aptById(id);const a=A(
 /* ===== OneDrive sync (Microsoft 365, app "Herakles Joint Inspection" in the Mercury tenant) =====
    every apartment is one JSON file and every photo one JPG in OneDrive: TLC PROJECTS/HERAKLES/Inspection app/data
    the phone keeps working without signal; changes are sent when there is signal, and other devices pick them up */
-const SY={clientId:"9c35223e-193b-47f3-bae1-cac6155c5262",tenant:"77c3de7b-4cbc-4df1-a204-83c9a1b8da4b",root:"TLC PROJECTS/HERAKLES/Inspection app/data",reports:"TLC PROJECTS/HERAKLES/Inspection reports/HUS B/Signed reports",scopes:["Files.ReadWrite","User.Read"],mail:["Mail.Send"]};
+const SY={clientId:"9c35223e-193b-47f3-bae1-cac6155c5262",tenant:"77c3de7b-4cbc-4df1-a204-83c9a1b8da4b",root:"TLC PROJECTS/HERAKLES/Inspection app/data",reports:"TLC PROJECTS/HERAKLES/Inspection reports/HUS B/Signed reports",scopes:["Files.ReadWrite","User.Read"],mail:["Mail.Send"],mailBig:["Mail.ReadWrite","Mail.Send"]};
 /* distribution list for the signed reports (agreed with Dan 16 Nov) */
 const MAILTO=[["Robin Rask","robin.rask@newtime.se"],["Nicklas Palm","nicklas.palm@newtime.se"],["Richard Lantz","richard.lantz@newtime.se"],["Joey Zong","joey.zong@cimc.com"],["Evan Wang","evan.wang@cimc.com"],["Jinxiang Zhou","jinxiang.zhou@cimc.com"]];
 const sy={app:null,acct:null,meta:{etag:{},hash:{},up:{},dev:null},status:"off",msg:"",busy:false,again:false,t:null,last:0,err:""};
@@ -992,7 +994,7 @@ function syncWire(){const on=document.getElementById("syncOn");if(on)on.onclick=
 function setSync(s,m){sy.status=s;if(m!==undefined)sy.err=m;syncPaint()}
 function schedSync(){if(!sy.acct)return;clearTimeout(sy.t);sy.t=setTimeout(syncNow,3000)}
 async function syToken(){try{const r=await sy.app.acquireTokenSilent({scopes:SY.scopes,account:sy.acct});return r.accessToken}catch(e){setSync("login");throw e}}
-async function gr(path,opt={},scopes){const tk=scopes?(await sy.app.acquireTokenSilent({scopes,account:sy.acct})).accessToken:await syToken();const r=await fetch("https://graph.microsoft.com/v1.0"+path,Object.assign({},opt,{headers:Object.assign({Authorization:"Bearer "+tk},opt.headers||{})}));return r}
+async function gr(path,opt={},scopes){let tk;if(scopes){try{tk=(await sy.app.acquireTokenSilent({scopes,account:sy.acct})).accessToken}catch(e){try{e.scopes=scopes}catch(x){}throw e}}else tk=await syToken();const r=await fetch("https://graph.microsoft.com/v1.0"+path,Object.assign({},opt,{headers:Object.assign({Authorization:"Bearer "+tk},opt.headers||{})}));return r}
 const pItem=rel=>`/me/drive/root:/${gEnc(SY.root+"/"+rel)}:`;
 async function syncInit(){if(!window.msal)return;try{
  sy.app=new msal.PublicClientApplication({auth:{clientId:SY.clientId,authority:"https://login.microsoftonline.com/"+SY.tenant,redirectUri:location.origin+location.pathname.replace(/index\.html$/,""),navigateToLoginRequestUrl:false,OIDCOptions:{serverResponseType:"query",defaultScopes:["openid","profile","offline_access"]}},cache:{cacheLocation:"localStorage"}});
@@ -1051,7 +1053,10 @@ function mailBody(Pp,a,link){const st=aptStat(a);const sg=a.signs||{};const me=(
  <p>Signed by ${esc(sg.rec?sg.rec.name+" ("+sg.rec.company+")":"")} and ${esc(sg.other?sg.other.name+" ("+sg.other.company+")":"")} on ${dtF(a.signedAt)}.<br>Result: ${st.ok} items OK · ${st.defs} defect${st.defs===1?"":"s"}${wd?` (${wd} water damage)`:""} · ${st.na} not able to inspect${st.na?" (2nd round)":""}.</p>
  ${link?`<p>The signed PDF is too large to attach – open it here: <a href="${link}">${esc(fileBase(Pp,a))}.pdf</a><br>CSV attached = all points and defects (opens in Excel).</p>`:`<p>PDF = signed report with plan, defect list and photos · CSV = all points and defects (opens in Excel).</p>`}<p>Best regards,<br>${esc(me)}</p>`}
 const b64=buf=>{let s="";const u=new Uint8Array(buf);for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)};
-async function makeReportFiles(id){const Pp=aptById(id);const a=A(id);const pdf=await buildPDF(id);const csv=new Blob([toCSV(aptRows(Pp))],{type:"text/csv"});const base=fileBase(Pp,a);
+/* photos in the e-mailed PDF: max 2000 px, JPEG 0.85 – defects stay readable; originals stay in OneDrive data\photos */
+const MAILMAX=2.9*1024*1024,PDFQ=[[2000,0.85],[1600,0.8]],PDFSAFE=18*1024*1024; /* most company mail servers refuse > 20–25 MB */
+async function makeReportFiles(id){const Pp=aptById(id);const a=A(id);const csv=new Blob([toCSV(aptRows(Pp))],{type:"text/csv"});const base=fileBase(Pp,a);let pdf=null;
+ for(const [max,q] of PDFQ){pdf=await buildPDF(id,{max,q});if(pdf.size<=PDFSAFE)break}
  return [{name:base+".pdf",type:"application/pdf",blob:pdf},{name:base+".csv",type:"text/csv",blob:csv}]}
 async function gUploadSession(url,blob,driveStyle){const CH=driveStyle?327680*12:3*1024*1024;let pos=0,last=null;
  while(pos<blob.size){const part=blob.slice(pos,Math.min(blob.size,pos+CH));const r=await fetch(url,{method:"PUT",headers:{"Content-Range":`bytes ${pos}-${pos+part.size-1}/${blob.size}`,"Content-Type":"application/octet-stream"},body:part});
@@ -1061,15 +1066,23 @@ async function driveCopy(f){const path=`/me/drive/root:/${gEnc(SY.reports+"/"+f.
  if(f.blob.size<3.9*1024*1024){const r=await gr(path+"/content",{method:"PUT",headers:{"Content-Type":f.type},body:f.blob});return r.ok?await r.json():null}
  const ss=await gr(path+"/createUploadSession",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:{"@microsoft.graph.conflictBehavior":"replace"}})});if(!ss.ok)return null;const u=await ss.json();return await gUploadSession(u.uploadUrl,f.blob,true)}
 async function shareLink(it){for(const scope of ["anonymous","organization"]){try{const r=await gr(`/me/drive/items/${it.id}/createLink`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"view",scope})});if(r.ok){const j=await r.json();if(j.link&&j.link.webUrl)return j.link.webUrl}}catch(e){}}return null}
+/* large report (over ~3 MB): Outlook draft + upload session (up to 150 MB) – needs Mail.ReadWrite, accepted once */
+async function sendBigMail(Pp,a,files){const sc=SY.mailBig;
+ const msg={subject:mailSubject(Pp,a),body:{contentType:"HTML",content:mailBody(Pp,a,null)},toRecipients:MAILTO.map(([n,e])=>({emailAddress:{name:n,address:e}}))};
+ let r=await gr("/me/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(msg)},sc);if(!r.ok)throw await grErr(r,"draft");const m=await r.json();
+ try{for(const f of files){if(f.blob.size<2.8*1024*1024){r=await gr(`/me/messages/${m.id}/attachments`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({"@odata.type":"#microsoft.graph.fileAttachment",name:f.name,contentType:f.type,contentBytes:b64(await f.blob.arrayBuffer())})},sc);if(!r.ok)throw await grErr(r,"attach")}
+   else{r=await gr(`/me/messages/${m.id}/attachments/createUploadSession`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({AttachmentItem:{attachmentType:"file",name:f.name,size:f.blob.size,contentType:f.type}})},sc);if(!r.ok)throw await grErr(r,"upload session");const us=await r.json();await gUploadSession(us.uploadUrl,f.blob,false)}}
+  r=await gr(`/me/messages/${m.id}/send`,{method:"POST"},sc);if(!r.ok&&r.status!==202)throw await grErr(r,"send")}
+ catch(e){try{await gr(`/me/messages/${m.id}`,{method:"DELETE"},sc)}catch(x){}throw e}}
 /* Mail.Send allows /me/sendMail only (no drafts) – attachments go inline; a PDF too large to attach goes as a OneDrive link */
 async function sendReportMail(id){const Pp=aptById(id);const a=A(id);const files=await makeReportFiles(id);
  let it=null;try{it=await driveCopy(files[0])}catch(e){console.error("report copy",e)}
- const big=files.reduce((t,f)=>t+f.blob.size,0)>2.9*1024*1024;let link=null;
- if(big){if(!it)throw new Error("The PDF is too large to attach and could not be saved in OneDrive");link=await shareLink(it);if(!link)throw new Error("The PDF is too large to attach and no OneDrive link could be made")}
- const att=[];for(const f of (big?files.slice(1):files))att.push({"@odata.type":"#microsoft.graph.fileAttachment",name:f.name,contentType:f.type,contentBytes:b64(await f.blob.arrayBuffer())});
+ const tot=files.reduce((t,f)=>t+f.blob.size,0);const link=null;
+ if(tot>MAILMAX){await sendBigMail(Pp,a,files)}else{
+ const att=[];for(const f of files)att.push({"@odata.type":"#microsoft.graph.fileAttachment",name:f.name,contentType:f.type,contentBytes:b64(await f.blob.arrayBuffer())});
  const msg={subject:mailSubject(Pp,a),body:{contentType:"HTML",content:mailBody(Pp,a,link)},toRecipients:MAILTO.map(([n,e])=>({emailAddress:{name:n,address:e}})),attachments:att};
  const r=await gr("/me/sendMail",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg,saveToSentItems:true})},SY.mail);
- if(!r.ok&&r.status!==202)throw await grErr(r,"send");
+ if(!r.ok&&r.status!==202)throw await grErr(r,"send")}
  a.sentAt=Date.now();a.sentRev=a.rev||0;a.sentTo=MAILTO.map(x=>x[1]);delete a.mailTodo;delete a.mailQueued;saveState()}
 let mailBusy=false;const mailErr={};
 const mq=()=>sy.meta.mq||(sy.meta.mq={});
@@ -1081,7 +1094,7 @@ async function trySend(id,fromQueue){if(mailBusy)return;const a=A(id);if(!sy.acc
  mailBusy=true;delete mailErr[id];if(!fromQueue){toast("Sending the e-mail…");render()}
  try{await sendReportMail(id);delete mq()[id];saveMeta();toast(`E-mail sent to ${MAILTO.length} people ✓`)}
  catch(e){console.error("mail",e);const txt=String(e&&(e.errorCode||e.message)||e);const need=e&&(e.name==="InteractionRequiredAuthError"||/consent|interaction|login_required/i.test(txt));
-  if(need){delete mq()[id];saveMeta();toast("Allow the app to send e-mail – one time");try{sessionStorage.setItem("mailAfterLogin",id);await sy.app.acquireTokenRedirect({scopes:SY.mail,account:sy.acct})}catch(x){}}
+  if(need){delete mq()[id];saveMeta();toast((e&&e.scopes&&e.scopes.includes("Mail.ReadWrite"))?"Large report – allow the app to attach large files, one time":"Allow the app to send e-mail – one time");try{sessionStorage.setItem("mailAfterLogin",id);await sy.app.acquireTokenRedirect({scopes:(e&&e.scopes)||SY.mail,account:sy.acct})}catch(x){}}
   else if(!navigator.onLine||(/failed to fetch|network/i.test(txt)&&(mq()[id+"#n"]=(mq()[id+"#n"]||0)+1)<3)){mq()[id]=Date.now();a.mailTodo=1;saveMeta();saveState();toast("No signal – the e-mail goes out by itself when there is signal")}
   else{delete mq()[id];delete mq()[id+"#n"];saveMeta();a.mailTodo=1;saveState();mailErr[id]=txt;toast("E-mail NOT sent – the reason is on the Send report screen")}}
  finally{mailBusy=false;render()}}
